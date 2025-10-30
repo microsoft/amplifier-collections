@@ -24,6 +24,36 @@ from .schema import CollectionMetadata
 logger = logging.getLogger(__name__)
 
 
+def _find_collection_root(target_dir: Path) -> Path | None:
+    """Find collection root by locating pyproject.toml.
+
+    Supports both structures:
+    - Flat: target_dir/pyproject.toml (git clone, manual)
+    - Nested: target_dir/pkg_name/pyproject.toml (pip install)
+
+    Args:
+        target_dir: Installation target directory
+
+    Returns:
+        Path to collection root (where pyproject.toml is), or None if not found
+
+    Note:
+        Uses same discovery pattern as CollectionResolver for consistency.
+        Per RUTHLESS_SIMPLICITY: Accept structure as-is.
+    """
+    # Strategy 1: Flat structure
+    if (target_dir / "pyproject.toml").exists():
+        return target_dir
+
+    # Strategy 2: Nested package structure
+    # Search immediate subdirectories for pyproject.toml
+    for item in target_dir.iterdir():
+        if item.is_dir() and not item.name.startswith(".") and (item / "pyproject.toml").exists():
+            return item
+
+    return None
+
+
 async def install_collection(
     source: InstallSourceProtocol,
     target_dir: Path,
@@ -71,23 +101,24 @@ async def install_collection(
         logger.info(f"Installing collection to {target_dir}")
         await source.install_to(target_dir)
 
-        # Step 2: Validate pyproject.toml exists and find collection root
-        # uv pip install creates package structure: target_dir/package_name/pyproject.toml
-        # We need to track the actual collection root (may be subdirectory)
-        pyproject_path = target_dir / "pyproject.toml"
-        collection_root = target_dir  # Default: assume root-level collection
+        # Step 2: Find collection root (where pyproject.toml is)
+        # Supports both structures:
+        # - Flat: target_dir/pyproject.toml (git clone, manual)
+        # - Nested: target_dir/pkg_name/pyproject.toml (pip install)
+        # Per RUTHLESS_SIMPLICITY: Use same pattern as CollectionResolver
+        collection_root = _find_collection_root(target_dir)
 
-        if not pyproject_path.exists():
-            # Search for pyproject.toml in top-level directories
-            found_paths = list(target_dir.glob("*/pyproject.toml"))
-            if found_paths:
-                pyproject_path = found_paths[0]
-                collection_root = pyproject_path.parent  # Actual collection root is the package directory
-                logger.debug(f"Found pyproject.toml in package directory: {pyproject_path}")
-            else:
-                raise CollectionInstallError(
-                    f"No pyproject.toml found in collection at {target_dir}", context={"target_dir": str(target_dir)}
-                )
+        if not collection_root:
+            raise CollectionInstallError(
+                f"No pyproject.toml found in {target_dir}.\n"
+                f"Expected at:\n"
+                f"  - {target_dir / 'pyproject.toml'} (flat structure), or\n"
+                f"  - {target_dir / '*' / 'pyproject.toml'} (pip install structure)",
+                context={"target_dir": str(target_dir)},
+            )
+
+        pyproject_path = collection_root / "pyproject.toml"
+        logger.debug(f"Collection root: {collection_root}")
 
         # Step 3: Parse metadata
         metadata = CollectionMetadata.from_pyproject(pyproject_path)
