@@ -119,3 +119,114 @@ def test_resolver_ignores_nonexistent_paths():
     # Should not crash
     assert resolver.resolve("anything") is None
     assert resolver.list_collections() == []
+
+
+def test_resolver_nested_structure():
+    """Test resolver handles nested package structure from pip install."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+
+        # Create nested structure (as pip install creates)
+        # Collection name: my-collection
+        # Package name: my_collection (hyphens → underscores)
+        collection_dir = base / "collections" / "my-collection"
+        package_dir = collection_dir / "my_collection"
+        package_dir.mkdir(parents=True)
+
+        # pyproject.toml in package directory (nested)
+        (package_dir / "pyproject.toml").write_text("[project]\nname='my-collection'\nversion='1.0.0'")
+
+        # Create resources in package directory
+        (package_dir / "profiles").mkdir()
+        (package_dir / "profiles" / "test.md").write_text("# Test profile")
+
+        resolver = CollectionResolver(search_paths=[base / "collections"])
+
+        # Should find collection in nested structure
+        found = resolver.resolve("my-collection")
+        assert found is not None
+        assert found == package_dir  # Points to package directory
+        assert (found / "pyproject.toml").exists()
+
+
+def test_resolver_flat_vs_nested_precedence():
+    """Test that flat structure takes precedence over nested when both exist."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        collection_dir = base / "collections" / "test-col"
+
+        # Create both flat and nested structures
+        collection_dir.mkdir(parents=True)
+
+        # Flat structure at root
+        (collection_dir / "pyproject.toml").write_text("[project]\nname='test-col'\nversion='1.0.0'")
+
+        # Nested structure in package subdir
+        package_dir = collection_dir / "test_col"
+        package_dir.mkdir()
+        (package_dir / "pyproject.toml").write_text("[project]\nname='test-col'\nversion='2.0.0'")
+
+        resolver = CollectionResolver(search_paths=[base / "collections"])
+
+        # Should prefer flat structure
+        found = resolver.resolve("test-col")
+        assert found is not None
+        assert found == collection_dir  # Not the nested one
+
+
+def test_resolver_hyphen_to_underscore_conversion():
+    """Test that resolver handles hyphen to underscore package name conversion."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+
+        # Collection with hyphens: design-intelligence
+        # Package with underscores: design_intelligence
+        collection_dir = base / "collections" / "design-intelligence"
+        package_dir = collection_dir / "design_intelligence"
+        package_dir.mkdir(parents=True)
+
+        (package_dir / "pyproject.toml").write_text("[project]\nname='design-intelligence'\nversion='1.0.0'")
+
+        resolver = CollectionResolver(search_paths=[base / "collections"])
+
+        # Should find using hyphen name
+        found = resolver.resolve("design-intelligence")
+        assert found is not None
+        assert found == package_dir
+        assert (found / "pyproject.toml").exists()
+
+
+def test_list_collections_mixed_structures():
+    """Test listing collections with mixed flat and nested structures."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        collections_path = base / "collections"
+        collections_path.mkdir()
+
+        # Flat structure collection
+        flat_col = collections_path / "flat-collection"
+        flat_col.mkdir()
+        (flat_col / "pyproject.toml").write_text("[project]\nname='flat-collection'\nversion='1.0.0'")
+
+        # Nested structure collection
+        nested_col = collections_path / "nested-collection"
+        nested_pkg = nested_col / "nested_collection"
+        nested_pkg.mkdir(parents=True)
+        (nested_pkg / "pyproject.toml").write_text("[project]\nname='nested-collection'\nversion='1.0.0'")
+
+        resolver = CollectionResolver(search_paths=[collections_path])
+
+        collections = resolver.list_collections()
+
+        # Should find both
+        assert len(collections) == 2
+        names = [name for name, path in collections]
+        assert "flat-collection" in names
+        assert "nested-collection" in names
+
+        # Verify paths point to collection roots
+        flat_entry = [path for name, path in collections if name == "flat-collection"][0]
+        assert flat_entry == flat_col
+
+        nested_entry = [path for name, path in collections if name == "nested-collection"][0]
+        assert nested_entry == nested_pkg  # Points to nested location
