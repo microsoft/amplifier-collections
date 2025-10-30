@@ -71,14 +71,18 @@ async def install_collection(
         logger.info(f"Installing collection to {target_dir}")
         await source.install_to(target_dir)
 
-        # Step 2: Validate pyproject.toml exists
-        # Try root first, then search in package directories (uv pip install puts it in package)
+        # Step 2: Validate pyproject.toml exists and find collection root
+        # uv pip install creates package structure: target_dir/package_name/pyproject.toml
+        # We need to track the actual collection root (may be subdirectory)
         pyproject_path = target_dir / "pyproject.toml"
+        collection_root = target_dir  # Default: assume root-level collection
+
         if not pyproject_path.exists():
             # Search for pyproject.toml in top-level directories
             found_paths = list(target_dir.glob("*/pyproject.toml"))
             if found_paths:
                 pyproject_path = found_paths[0]
+                collection_root = pyproject_path.parent  # Actual collection root is the package directory
                 logger.debug(f"Found pyproject.toml in package directory: {pyproject_path}")
             else:
                 raise CollectionInstallError(
@@ -89,8 +93,9 @@ async def install_collection(
         metadata = CollectionMetadata.from_pyproject(pyproject_path)
         logger.debug(f"Collection name: {metadata.name}")
 
-        # Step 4: Discover resources (validation)
-        resources = discover_collection_resources(target_dir)
+        # Step 4: Discover resources from actual collection root (not target_dir!)
+        # This is critical for data-only collections installed via uv pip install
+        resources = discover_collection_resources(collection_root)
         logger.debug(f"Discovered resources: {resources}")
 
         # Step 5: Add to lock file (if provided)
