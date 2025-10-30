@@ -72,11 +72,18 @@ async def install_collection(
         await source.install_to(target_dir)
 
         # Step 2: Validate pyproject.toml exists
+        # Try root first, then search in package directories (uv pip install puts it in package)
         pyproject_path = target_dir / "pyproject.toml"
         if not pyproject_path.exists():
-            raise CollectionInstallError(
-                f"No pyproject.toml found in collection at {target_dir}", context={"target_dir": str(target_dir)}
-            )
+            # Search for pyproject.toml in top-level directories
+            found_paths = list(target_dir.glob("*/pyproject.toml"))
+            if found_paths:
+                pyproject_path = found_paths[0]
+                logger.debug(f"Found pyproject.toml in package directory: {pyproject_path}")
+            else:
+                raise CollectionInstallError(
+                    f"No pyproject.toml found in collection at {target_dir}", context={"target_dir": str(target_dir)}
+                )
 
         # Step 3: Parse metadata
         metadata = CollectionMetadata.from_pyproject(pyproject_path)
