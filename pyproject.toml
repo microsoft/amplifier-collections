@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amplifier-collections"
+version = "0.1.0"
+description = "Convention-based collection discovery and management for Amplifier applications"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Microsoft Corporation"}
+]
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["amplifier_collections"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
