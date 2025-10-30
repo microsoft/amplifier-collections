@@ -124,3 +124,84 @@ async def test_uninstall_nonexistent_collection():
 
         with pytest.raises(CollectionInstallError, match="not found"):
             await uninstall_collection(collection_name="nonexistent", collections_dir=collections_dir)
+
+
+def test_find_collection_root_flat_structure():
+    """Test _find_collection_root with flat structure."""
+    from amplifier_collections.installer import _find_collection_root
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        target_dir = Path(tmpdir) / "my-collection"
+        target_dir.mkdir()
+        (target_dir / "pyproject.toml").write_text("[project]\nname='my-collection'")
+
+        root = _find_collection_root(target_dir)
+        assert root == target_dir
+
+
+def test_find_collection_root_nested_structure():
+    """Test _find_collection_root with nested pip install structure."""
+    from amplifier_collections.installer import _find_collection_root
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        target_dir = Path(tmpdir) / "my-collection"
+        package_dir = target_dir / "my_collection"
+        package_dir.mkdir(parents=True)
+        (package_dir / "pyproject.toml").write_text("[project]\nname='my-collection'")
+
+        root = _find_collection_root(target_dir)
+        assert root == package_dir  # Points to nested location
+
+
+def test_find_collection_root_not_found():
+    """Test _find_collection_root returns None when pyproject.toml missing."""
+    from amplifier_collections.installer import _find_collection_root
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        target_dir = Path(tmpdir) / "empty"
+        target_dir.mkdir()
+
+        root = _find_collection_root(target_dir)
+        assert root is None
+
+
+class MockNestedSource:
+    """Mock source that creates nested package structure like pip install."""
+
+    def __init__(self, collection_name: str):
+        self.collection_name = collection_name
+        self.uri = f"mock://{collection_name}"
+        self.commit_sha = "nested123"
+
+    async def install_to(self, target_dir: Path) -> None:
+        """Create nested structure: target_dir/pkg_name/pyproject.toml."""
+        package_name = self.collection_name.replace("-", "_")
+        package_dir = target_dir / package_name
+        package_dir.mkdir(parents=True, exist_ok=True)
+
+        (package_dir / "pyproject.toml").write_text(
+            f"""
+[project]
+name = "{self.collection_name}"
+version = "2.0.0"
+description = "Nested test collection"
+"""
+        )
+
+
+@pytest.mark.asyncio
+async def test_install_collection_nested_structure():
+    """Test installer handles nested package structure from pip install."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        target_dir = Path(tmpdir) / "design-intelligence"
+        source = MockNestedSource("design-intelligence")
+
+        metadata = await install_collection(source=source, target_dir=target_dir)
+
+        # Should handle nested structure
+        assert metadata.name == "design-intelligence"
+        assert metadata.version == "2.0.0"
+
+        # pyproject.toml should be in package subdirectory
+        package_dir = target_dir / "design_intelligence"
+        assert (package_dir / "pyproject.toml").exists()
