@@ -53,26 +53,45 @@ class CollectionResolver:
         """
         Resolve collection name to installation path.
 
+        Supports both structure types:
+        - Flat: collections/name/pyproject.toml (git clone, manual)
+        - Nested: collections/name/pkg_name/pyproject.toml (pip install)
+
+        Per RUTHLESS_SIMPLICITY: Accept structure as-is, don't transform.
+        Per WORK_WITH_STANDARDS: Python packaging creates nested structure.
+
         Searches in reverse precedence order (highest first).
 
         Args:
             collection_name: Name of collection (e.g., "foundation")
 
         Returns:
-            Path to collection directory if found, None otherwise
+            Path to collection root (where pyproject.toml is) if found, None otherwise
 
         Example:
             >>> resolver = CollectionResolver(search_paths=[...])
             >>> path = resolver.resolve("foundation")
-            >>> # Returns ~/.amplifier/collections/foundation or bundled path
+            >>> # Returns ~/.amplifier/collections/foundation
+            >>> # or ~/.amplifier/collections/foundation/foundation_pkg
         """
         # Search in reverse order (highest precedence first)
         for search_path in reversed(self.search_paths):
             candidate = search_path / collection_name
 
-            # Check if directory exists and has pyproject.toml
-            if candidate.exists() and candidate.is_dir() and (candidate / "pyproject.toml").exists():
+            if not candidate.exists() or not candidate.is_dir():
+                continue
+
+            # Strategy 1: Flat structure (git clone, manual creation)
+            if (candidate / "pyproject.toml").exists():
                 return candidate.resolve()
+
+            # Strategy 2: Nested package structure (pip install)
+            # Python packaging: my-collection → my_collection/ (hyphens → underscores)
+            package_name = collection_name.replace("-", "_")
+            nested_candidate = candidate / package_name
+
+            if nested_candidate.exists() and (nested_candidate / "pyproject.toml").exists():
+                return nested_candidate.resolve()
 
         return None
 
@@ -91,8 +110,11 @@ class CollectionResolver:
         """
         List all available collections with their paths.
 
-        Returns list of (name, path) tuples. Higher precedence collections
+        Returns list of (name, path) tuples pointing to collection roots
+        (where pyproject.toml is located). Higher precedence collections
         override lower precedence (e.g., user overrides bundled).
+
+        Handles both flat and nested structures automatically.
 
         Returns:
             List of (collection_name, collection_path) tuples
@@ -103,7 +125,7 @@ class CollectionResolver:
             >>> for name, path in collections:
             ...     print(f"{name}: {path}")
             foundation: ~/.amplifier/collections/foundation
-            developer-expertise: /bundled/data/collections/developer-expertise
+            developer-expertise: ~/.amplifier/collections/developer-expertise/developer_expertise
         """
         collections = {}
 
@@ -117,9 +139,13 @@ class CollectionResolver:
                 if not collection_dir.is_dir():
                     continue
 
-                # Valid collection must have pyproject.toml
-                if (collection_dir / "pyproject.toml").exists():
+                collection_name = collection_dir.name
+
+                # Use resolve() to find actual collection root (handles both structures)
+                collection_root = self.resolve(collection_name)
+
+                if collection_root:
                     # Higher precedence overwrites
-                    collections[collection_dir.name] = collection_dir
+                    collections[collection_name] = collection_root
 
         return list(collections.items())
