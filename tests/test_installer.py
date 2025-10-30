@@ -128,7 +128,7 @@ async def test_uninstall_nonexistent_collection():
 
 def test_find_collection_root_flat_structure():
     """Test _find_collection_root with flat structure."""
-    from amplifier_collections.installer import _find_collection_root
+    from amplifier_collections.installer import _find_collection_root  # type: ignore
 
     with tempfile.TemporaryDirectory() as tmpdir:
         target_dir = Path(tmpdir) / "my-collection"
@@ -141,7 +141,7 @@ def test_find_collection_root_flat_structure():
 
 def test_find_collection_root_nested_structure():
     """Test _find_collection_root with nested pip install structure."""
-    from amplifier_collections.installer import _find_collection_root
+    from amplifier_collections.installer import _find_collection_root  # type: ignore
 
     with tempfile.TemporaryDirectory() as tmpdir:
         target_dir = Path(tmpdir) / "my-collection"
@@ -155,7 +155,7 @@ def test_find_collection_root_nested_structure():
 
 def test_find_collection_root_not_found():
     """Test _find_collection_root returns None when pyproject.toml missing."""
-    from amplifier_collections.installer import _find_collection_root
+    from amplifier_collections.installer import _find_collection_root  # type: ignore
 
     with tempfile.TemporaryDirectory() as tmpdir:
         target_dir = Path(tmpdir) / "empty"

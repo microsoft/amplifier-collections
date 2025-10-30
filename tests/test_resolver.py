@@ -275,3 +275,32 @@ def test_resolver_nested_with_mismatched_directory_name():
         found = resolver.resolve("design-intelligence")
         assert found is not None
         assert found == package_dir
+
+
+def test_list_collections_returns_metadata_names():
+    """Verify list_collections() returns metadata names, not directory names."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+        collections_path = base / "collections"
+        collections_path.mkdir()
+
+        # Create collection with mismatched names
+        # Directory: amplifier-collection-test
+        # Metadata: test-collection
+        collection_dir = collections_path / "amplifier-collection-test"
+        collection_dir.mkdir()
+        (collection_dir / "pyproject.toml").write_text(
+            """[project]
+name = "test-collection"
+version = "1.0.0"
+"""
+        )
+
+        resolver = CollectionResolver(search_paths=[collections_path])
+        collections = resolver.list_collections()
+
+        # Should return metadata name, not directory name
+        assert len(collections) == 1
+        name, path = collections[0]
+        assert name == "test-collection"  # Metadata name
+        assert "amplifier-collection-test" not in name  # Not directory name

@@ -20,6 +20,7 @@ from .lock import CollectionLockEntry
 from .protocols import InstallSourceProtocol
 from .resolver import CollectionResolver
 from .schema import CollectionMetadata
+from .utils import extract_collection_name_from_path
 
 __all__ = [
     # Metadata
@@ -43,6 +44,8 @@ __all__ = [
     "CollectionInstallError",
     "CollectionMetadataError",
     "CollectionNotFoundError",
+    # Utilities
+    "extract_collection_name_from_path",
 ]
 
 __version__ = "0.1.0"

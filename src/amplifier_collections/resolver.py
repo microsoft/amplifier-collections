@@ -12,7 +12,10 @@ Per AGENTS.md: Ruthless simplicity - direct filesystem checks, no caching comple
 REFACTORED from CLI: Search paths must be injected by app, not hardcoded.
 """
 
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def _has_matching_name(pyproject_path: Path, expected_name: str) -> bool:
@@ -157,13 +160,13 @@ class CollectionResolver:
 
     def list_collections(self) -> list[tuple[str, Path]]:
         """
-        List all available collections with their paths.
+        List all available collections by METADATA name.
 
-        Returns list of (name, path) tuples pointing to collection roots
-        (where pyproject.toml is located). Higher precedence collections
-        override lower precedence (e.g., user overrides bundled).
+        Returns list of (metadata_name, collection_root_path) tuples.
+        Higher precedence collections override lower precedence.
 
-        Handles both flat and nested structures automatically.
+        Per RUTHLESS_SIMPLICITY: Metadata is single source of truth.
+        Per DRY: Reads metadata for canonical name.
 
         Returns:
             List of (collection_name, collection_path) tuples
@@ -173,8 +176,8 @@ class CollectionResolver:
             >>> collections = resolver.list_collections()
             >>> for name, path in collections:
             ...     print(f"{name}: {path}")
-            foundation: ~/.amplifier/collections/foundation
-            developer-expertise: ~/.amplifier/collections/developer-expertise/developer_expertise
+            design-intelligence: ~/.amplifier/collections/design-intelligence/design_intelligence
+            foundation: <package>/data/collections/foundation
         """
         collections = {}
 
@@ -185,16 +188,46 @@ class CollectionResolver:
                 continue
 
             for collection_dir in search_path.iterdir():
-                if not collection_dir.is_dir():
+                if not collection_dir.is_dir() or collection_dir.name.startswith("."):
                     continue
 
-                collection_name = collection_dir.name
+                # Find collection root and read metadata
+                metadata_name = None
+                collection_root = None
 
-                # Use resolve() to find actual collection root (handles both structures)
-                collection_root = self.resolve(collection_name)
+                # Try flat structure
+                if (collection_dir / "pyproject.toml").exists():
+                    try:
+                        from .schema import CollectionMetadata
 
-                if collection_root:
-                    # Higher precedence overwrites
-                    collections[collection_name] = collection_root
+                        metadata = CollectionMetadata.from_pyproject(collection_dir / "pyproject.toml")
+                        metadata_name = metadata.name
+                        collection_root = collection_dir.resolve()
+                    except Exception as e:
+                        logger.debug(f"Could not read metadata from {collection_dir}: {e}")
+
+                # Try nested structure if flat didn't work
+                if metadata_name is None:
+                    # Check immediate subdirectories
+                    for item in collection_dir.iterdir():
+                        if (
+                            item.is_dir()
+                            and not item.name.startswith(".")
+                            and not item.name.endswith(".dist-info")
+                            and (item / "pyproject.toml").exists()
+                        ):
+                            try:
+                                from .schema import CollectionMetadata
+
+                                metadata = CollectionMetadata.from_pyproject(item / "pyproject.toml")
+                                metadata_name = metadata.name
+                                collection_root = item.resolve()
+                                break
+                            except Exception as e:
+                                logger.debug(f"Could not read metadata from {item}: {e}")
+
+                # Add to collections if found (higher precedence overwrites)
+                if metadata_name and collection_root:
+                    collections[metadata_name] = collection_root
 
         return list(collections.items())
