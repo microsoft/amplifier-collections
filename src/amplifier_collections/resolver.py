@@ -15,6 +15,27 @@ REFACTORED from CLI: Search paths must be injected by app, not hardcoded.
 from pathlib import Path
 
 
+def _has_matching_name(pyproject_path: Path, expected_name: str) -> bool:
+    """Check if pyproject.toml has matching collection name.
+
+    Args:
+        pyproject_path: Path to pyproject.toml file
+        expected_name: Expected collection name
+
+    Returns:
+        True if names match, False otherwise
+    """
+    try:
+        import tomllib
+
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+        actual_name = data.get("project", {}).get("name")
+        return actual_name == expected_name
+    except Exception:
+        return False
+
+
 class CollectionResolver:
     """
     Resolve collection names to installation paths (with injected search paths).
@@ -53,45 +74,73 @@ class CollectionResolver:
         """
         Resolve collection name to installation path.
 
-        Supports both structure types:
+        Supports both structure types and naming patterns:
         - Flat: collections/name/pyproject.toml (git clone, manual)
         - Nested: collections/name/pkg_name/pyproject.toml (pip install)
+        - Directory names may differ from collection names (e.g., repo name vs metadata name)
 
-        Per RUTHLESS_SIMPLICITY: Accept structure as-is, don't transform.
+        Per RUTHLESS_SIMPLICITY: Search by metadata name, not directory name.
         Per WORK_WITH_STANDARDS: Python packaging creates nested structure.
 
         Searches in reverse precedence order (highest first).
 
         Args:
-            collection_name: Name of collection (e.g., "foundation")
+            collection_name: Name of collection from pyproject.toml metadata (e.g., "design-intelligence")
 
         Returns:
             Path to collection root (where pyproject.toml is) if found, None otherwise
 
         Example:
             >>> resolver = CollectionResolver(search_paths=[...])
-            >>> path = resolver.resolve("foundation")
-            >>> # Returns ~/.amplifier/collections/foundation
-            >>> # or ~/.amplifier/collections/foundation/foundation_pkg
+            >>> path = resolver.resolve("design-intelligence")
+            >>> # Finds ~/.amplifier/collections/amplifier-collection-design-intelligence/
+            >>> # by reading pyproject.toml files, not matching directory names
         """
         # Search in reverse order (highest precedence first)
         for search_path in reversed(self.search_paths):
-            candidate = search_path / collection_name
-
-            if not candidate.exists() or not candidate.is_dir():
+            if not search_path.exists():
                 continue
 
-            # Strategy 1: Flat structure (git clone, manual creation)
-            if (candidate / "pyproject.toml").exists():
-                return candidate.resolve()
+            # Try directory name match first (fast path)
+            candidate = search_path / collection_name
+            if candidate.exists() and candidate.is_dir():
+                # Strategy 1: Flat structure with matching directory name
+                if (candidate / "pyproject.toml").exists() and _has_matching_name(
+                    candidate / "pyproject.toml", collection_name
+                ):
+                    return candidate.resolve()
 
-            # Strategy 2: Nested package structure (pip install)
-            # Python packaging: my-collection → my_collection/ (hyphens → underscores)
-            package_name = collection_name.replace("-", "_")
-            nested_candidate = candidate / package_name
+                # Strategy 2: Nested package structure with matching directory name
+                package_name = collection_name.replace("-", "_")
+                nested_candidate = candidate / package_name
+                if (
+                    nested_candidate.exists()
+                    and (nested_candidate / "pyproject.toml").exists()
+                    and _has_matching_name(nested_candidate / "pyproject.toml", collection_name)
+                ):
+                    return nested_candidate.resolve()
 
-            if nested_candidate.exists() and (nested_candidate / "pyproject.toml").exists():
-                return nested_candidate.resolve()
+            # Slow path: Directory name doesn't match metadata name
+            # (e.g., repo "amplifier-collection-X" but metadata "X")
+            # Search all subdirectories
+            for subdir in search_path.iterdir():
+                if not subdir.is_dir() or subdir.name.startswith("."):
+                    continue
+
+                # Check flat structure
+                if (subdir / "pyproject.toml").exists() and _has_matching_name(
+                    subdir / "pyproject.toml", collection_name
+                ):
+                    return subdir.resolve()
+
+                # Check nested structure
+                for nested in subdir.iterdir():
+                    if (
+                        nested.is_dir()
+                        and (nested / "pyproject.toml").exists()
+                        and _has_matching_name(nested / "pyproject.toml", collection_name)
+                    ):
+                        return nested.resolve()
 
         return None
 

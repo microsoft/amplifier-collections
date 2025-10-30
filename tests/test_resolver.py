@@ -230,3 +230,48 @@ def test_list_collections_mixed_structures():
 
         nested_entry = [path for name, path in collections if name == "nested-collection"][0]
         assert nested_entry == nested_pkg  # Points to nested location
+
+
+def test_resolver_directory_name_differs_from_metadata():
+    """Test resolver finds collections when directory name differs from metadata name.
+
+    Real-world case: repo "amplifier-collection-design-intelligence"
+                     but metadata name "design-intelligence"
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+
+        # Directory name has prefix, metadata name doesn't
+        repo_dir = base / "collections" / "amplifier-collection-design-intelligence"
+        repo_dir.mkdir(parents=True)
+
+        # Flat structure with mismatched name
+        (repo_dir / "pyproject.toml").write_text("[project]\nname='design-intelligence'\nversion='1.0.0'")
+
+        resolver = CollectionResolver(search_paths=[base / "collections"])
+
+        # Should find by metadata name, not directory name
+        found = resolver.resolve("design-intelligence")
+        assert found is not None
+        assert found == repo_dir
+        assert (found / "pyproject.toml").exists()
+
+
+def test_resolver_nested_with_mismatched_directory_name():
+    """Test resolver finds nested collections with mismatched directory names."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = Path(tmpdir)
+
+        # Repo directory name differs from metadata
+        repo_dir = base / "collections" / "amplifier-collection-design-intelligence"
+        package_dir = repo_dir / "design_intelligence"
+        package_dir.mkdir(parents=True)
+
+        (package_dir / "pyproject.toml").write_text("[project]\nname='design-intelligence'\nversion='1.0.0'")
+
+        resolver = CollectionResolver(search_paths=[base / "collections"])
+
+        # Should find by metadata name via slow path
+        found = resolver.resolve("design-intelligence")
+        assert found is not None
+        assert found == package_dir
