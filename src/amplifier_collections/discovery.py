@@ -47,8 +47,11 @@ def discover_collection_resources(collection_path: Path) -> CollectionResources:
     - scenario-tools/ directory → tool packages (subdirs with pyproject.toml)
     - modules/ directory → amplifier modules (subdirs with pyproject.toml)
 
+    Per WORK_WITH_STANDARDS: Handles hybrid packaging where resources may be
+    at parent level (common with improperly packaged wheels).
+
     Args:
-        collection_path: Path to collection directory
+        collection_path: Path to collection directory (where pyproject.toml is)
 
     Returns:
         CollectionResources with discovered items
@@ -59,30 +62,52 @@ def discover_collection_resources(collection_path: Path) -> CollectionResources:
         >>> for profile in resources.profiles:
         ...     print(f"  {profile.name}")
     """
+    # Try discovering from collection_path first
+    resources = _discover_at_path(collection_path)
+
+    # If no resources found and collection_path looks like a package directory,
+    # try parent directory (handles hybrid packaging where resources extracted to root)
+    if not resources.has_resources() and (collection_path / "pyproject.toml").exists():
+        parent_resources = _discover_at_path(collection_path.parent)
+        if parent_resources.has_resources():
+            return parent_resources
+
+    return resources
+
+
+def _discover_at_path(base_path: Path) -> CollectionResources:
+    """Discover resources at a specific path.
+
+    Args:
+        base_path: Path to search for resources
+
+    Returns:
+        CollectionResources with discovered items
+    """
     # Discover profiles
     profiles = []
-    profiles_dir = collection_path / "profiles"
+    profiles_dir = base_path / "profiles"
     if profiles_dir.exists() and profiles_dir.is_dir():
         # Only .md files directly in profiles/ (not recursive)
         profiles = sorted([f for f in profiles_dir.glob("*.md") if f.is_file()])
 
     # Discover agents
     agents = []
-    agents_dir = collection_path / "agents"
+    agents_dir = base_path / "agents"
     if agents_dir.exists() and agents_dir.is_dir():
         # Only .md files directly in agents/ (not recursive)
         agents = sorted([f for f in agents_dir.glob("*.md") if f.is_file()])
 
     # Discover context files
     context = []
-    context_dir = collection_path / "context"
+    context_dir = base_path / "context"
     if context_dir.exists() and context_dir.is_dir():
         # Recursive for context (can be organized in subdirs)
         context = sorted([f for f in context_dir.glob("**/*.md") if f.is_file()])
 
     # Discover scenario tools
     scenario_tools = []
-    scenario_tools_dir = collection_path / "scenario-tools"
+    scenario_tools_dir = base_path / "scenario-tools"
     if scenario_tools_dir.exists() and scenario_tools_dir.is_dir():
         # Subdirectories with pyproject.toml are tools
         for subdir in scenario_tools_dir.iterdir():
@@ -92,7 +117,7 @@ def discover_collection_resources(collection_path: Path) -> CollectionResources:
 
     # Discover modules
     modules = []
-    modules_dir = collection_path / "modules"
+    modules_dir = base_path / "modules"
     if modules_dir.exists() and modules_dir.is_dir():
         # Subdirectories with pyproject.toml are modules
         for subdir in modules_dir.iterdir():

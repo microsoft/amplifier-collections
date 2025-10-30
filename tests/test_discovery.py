@@ -159,3 +159,41 @@ def test_resources_immutable():
 
     with pytest.raises(ValidationError):
         resources.profiles = [Path("/new")]
+
+
+def test_discover_hybrid_packaging():
+    """Test discovery with hybrid packaging (resources at parent, pyproject.toml in package).
+
+    Real-world case: design-intelligence collection has:
+    - pyproject.toml at: design_intelligence/pyproject.toml
+    - But resources at: profiles/, agents/, context/ (parent level)
+
+    This happens when wheel packaging extracts resources to root but keeps
+    package directory for code.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        collection_dir = Path(tmpdir)
+
+        # Package directory with pyproject.toml
+        package_dir = collection_dir / "design_intelligence"
+        package_dir.mkdir()
+        (package_dir / "pyproject.toml").write_text("[project]\nname='design-intelligence'\nversion='1.0.0'")
+        (package_dir / "__init__.py").write_text("# Package")
+
+        # Resources at parent level (hybrid packaging)
+        profiles_dir = collection_dir / "profiles"
+        profiles_dir.mkdir()
+        (profiles_dir / "designer.md").write_text("# Designer")
+
+        agents_dir = collection_dir / "agents"
+        agents_dir.mkdir()
+        (agents_dir / "art-director.md").write_text("# Art Director")
+
+        # Discovery should check parent when package dir has no resources
+        resources = discover_collection_resources(package_dir)
+
+        # Should find resources at parent level
+        assert len(resources.profiles) == 1
+        assert len(resources.agents) == 1
+        assert resources.profiles[0].name == "designer.md"
+        assert resources.agents[0].name == "art-director.md"
