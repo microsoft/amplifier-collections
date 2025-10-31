@@ -6,6 +6,16 @@ amplifier-collections provides collection lifecycle management through filesyste
 
 ---
 
+## Documentation
+
+- **[Quick Start](#quick-start)** - Get started in 5 minutes
+- **[API Reference](#api-reference)** - Complete Python API documentation
+- **[User Guide](docs/USER_GUIDE.md)** - Using collections (installing, using resources, troubleshooting)
+- **[Collection Authoring Guide](docs/AUTHORING.md)** - Creating your own collections
+- **[Design Philosophy](#design-philosophy)** - System design and architecture
+
+---
+
 ## Installation
 
 ```bash
