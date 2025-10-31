@@ -138,6 +138,8 @@ EOF
 
 Collections follow **standard Python packaging**. Create a package directory (hyphens → underscores):
 
+**→ See [Package Structure Specification](SPECIFICATION.md#package-structure-for-installation) for complete technical contract**
+
 ```bash
 # Create package directory (hyphens → underscores!)
 PACKAGE_NAME=$(python3 -c "print('my-collection'.replace('-', '_'))")

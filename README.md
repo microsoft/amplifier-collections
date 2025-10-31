@@ -100,18 +100,9 @@ Applications define search paths; library provides resolution mechanism.
 
 ### Pluggable Installation Sources
 
-The library coordinates installation but doesn't dictate **how** collections are fetched:
+The library coordinates installation but doesn't dictate **how** collections are fetched.
 
-```python
-from typing import Protocol
-
-class InstallSourceProtocol(Protocol):
-    """Interface for collection installation sources."""
-
-    async def install_to(self, target_dir: Path) -> None:
-        """Install collection content to target directory."""
-        ...
-```
+**See:** [InstallSourceProtocol Specification](docs/SPECIFICATION.md#installsourceprotocol) for complete contract.
 
 **Standard implementations** (from amplifier-module-resolution):
 - `GitSource` - Git repositories via uv
@@ -131,6 +122,8 @@ Apps provide implementation; library uses the protocol.
 ### Metadata
 
 #### CollectionMetadata
+
+**See:** [pyproject.toml Format Specification](docs/SPECIFICATION.md#pyprojecttoml-format) for complete field reference and validation rules.
 
 ```python
 from amplifier_collections import CollectionMetadata
@@ -279,6 +272,8 @@ await uninstall_collection(
 ### Lock File Management
 
 #### CollectionLock
+
+**See:** [Lock File Format Specification](docs/SPECIFICATION.md#lock-file-format) for complete format details.
 
 ```python
 from amplifier_collections import CollectionLock, CollectionLockEntry
@@ -465,299 +460,6 @@ def test_collection_discovery():
         assert resources.profiles[0].name == "test.md"
 ```
 
----
-
-## API Reference
-
-**→ See [Specification](docs/SPECIFICATION.md) for collection format details**
-
-### CollectionResolver
-
-```python
-class CollectionResolver:
-    """Resolve collection names to filesystem paths."""
-
-    def __init__(self, search_paths: list[Path]):
-        """Initialize with app-specific search paths.
-
-        Args:
-            search_paths: Paths to search in precedence order (lowest to highest)
-                          Searches in REVERSE order (highest precedence first)
-        """
-
-    def resolve(self, collection_name: str) -> Path | None:
-        """Resolve collection name to installation path.
-
-        Searches search_paths in reverse order (highest precedence first).
-
-        Args:
-            collection_name: Name of collection (e.g., "foundation")
-
-        Returns:
-            Path to collection directory if found, None otherwise
-
-        Example:
-            >>> resolver = CollectionResolver(search_paths=[...])
-            >>> path = resolver.resolve("foundation")
-            >>> if path:
-            ...     print(f"Found at {path}")
-        """
-
-    def list_collections(self) -> list[tuple[str, Path]]:
-        """List all available collections with their paths.
-
-        Deduplicates by name, keeping highest precedence path.
-
-        Returns:
-            List of (collection_name, path) tuples
-
-        Example:
-            >>> for name, path in resolver.list_collections():
-            ...     print(f"{name}: {path}")
-            foundation: /home/user/.amplifier/collections/foundation
-            custom: .amplifier/collections/custom
-        """
-```
-
-### Resource Discovery
-
-```python
-from amplifier_collections import CollectionResources, discover_collection_resources
-
-class CollectionResources(BaseModel):
-    """Discovered resources in a collection."""
-    model_config = ConfigDict(frozen=True)
-
-    profiles: list[Path] = Field(default_factory=list)
-    agents: list[Path] = Field(default_factory=list)
-    context: list[Path] = Field(default_factory=list)
-    scenario_tools: list[Path] = Field(default_factory=list)
-    modules: list[Path] = Field(default_factory=list)
-
-def discover_collection_resources(collection_path: Path) -> CollectionResources:
-    """Discover resources in collection by convention.
-
-    Checks for well-known directories:
-    - profiles/*.md
-    - agents/*.md
-    - context/**/*.md (recursive)
-    - scenario-tools/*/
-    - modules/*/ (with __init__.py or pyproject.toml)
-
-    Args:
-        collection_path: Path to collection root directory
-
-    Returns:
-        CollectionResources with discovered paths
-
-    Example:
-        >>> resources = discover_collection_resources(Path("my-collection"))
-        >>> print(f"Profiles: {[p.stem for p in resources.profiles]}")
-        Profiles: ['optimized', 'debug']
-    """
-
-def list_profiles(collection_path: Path) -> list[str]:
-    """List profile names in collection (convenience helper).
-
-    Args:
-        collection_path: Path to collection directory
-
-    Returns:
-        List of profile names (without .md extension)
-
-    Example:
-        >>> profiles = list_profiles(Path("~/.amplifier/collections/foundation"))
-        >>> print(profiles)
-        ['base', 'foundation', 'production', 'test']
-    """
-
-def list_agents(collection_path: Path) -> list[str]:
-    """List agent names in collection (convenience helper).
-
-    Args:
-        collection_path: Path to collection directory
-
-    Returns:
-        List of agent names (without .md extension)
-
-    Example:
-        >>> agents = list_agents(Path("~/.amplifier/collections/developer-expertise"))
-        >>> print(agents)
-        ['bug-hunter', 'modular-builder', 'researcher', 'zen-architect']
-    """
-```
-
-### Utilities
-
-```python
-from amplifier_collections import extract_collection_name_from_path
-
-def extract_collection_name_from_path(search_path: Path) -> str | None:
-    """Extract collection metadata name from path containing /collections/.
-
-    Reads pyproject.toml to get authoritative name (not directory name).
-    Handles both flat and nested packaging structures.
-
-    Args:
-        search_path: Path containing "collections" component
-                    (e.g., ~/.amplifier/collections/dir-name/profiles/)
-
-    Returns:
-        Collection metadata name (e.g., "design-intelligence")
-        or None if not a collection path or metadata unreadable
-
-    Example:
-        >>> # Directory name may differ from metadata name
-        >>> path = Path("~/.amplifier/collections/amplifier-collection-design-intelligence/profiles/")
-        >>> extract_collection_name_from_path(path)
-        'design-intelligence'  # From pyproject.toml, not directory name
-
-        >>> # Non-collection path
-        >>> path = Path("~/.amplifier/profiles/")
-        >>> extract_collection_name_from_path(path)
-        None
-
-    Note:
-        After app layer directory normalization, directory name should equal metadata name.
-        This function is defensive and always reads metadata regardless.
-    """
-```
-
-### Installation Management
-
-```python
-from amplifier_collections import install_collection, uninstall_collection, CollectionInstallError
-
-async def install_collection(
-    source: InstallSourceProtocol,
-    target_dir: Path,
-    lock: CollectionLock | None = None
-) -> CollectionMetadata:
-    """Install collection from source.
-
-    Process:
-    1. Source installs content to target_dir (via source.install_to)
-    2. Validate pyproject.toml exists
-    3. Parse metadata
-    4. Discover resources
-    5. Add entry to lock file (if lock provided)
-
-    Args:
-        source: Installation source implementing InstallSourceProtocol
-        target_dir: Directory to install into (must not exist)
-        lock: Optional lock file manager
-
-    Returns:
-        CollectionMetadata from installed collection
-
-    Raises:
-        CollectionInstallError: If installation fails at any step
-
-    Example:
-        >>> from amplifier_module_resolution import GitSource
-        >>> source = GitSource("git+https://github.com/org/collection@v1.0.0")
-        >>> metadata = await install_collection(source, target_dir, lock)
-        >>> print(f"Installed {metadata.name}")
-    """
-
-async def uninstall_collection(
-    collection_name: str,
-    collections_dir: Path,
-    lock: CollectionLock | None = None
-) -> None:
-    """Uninstall collection.
-
-    Process:
-    1. Remove collection directory
-    2. Remove lock entry (if lock provided)
-
-    Args:
-        collection_name: Name of collection to remove
-        collections_dir: Parent directory containing collections
-        lock: Optional lock file manager
-
-    Raises:
-        CollectionInstallError: If uninstallation fails
-
-    Example:
-        >>> await uninstall_collection("my-collection", Path("..."), lock)
-    """
-```
-
-### Lock File Management
-
-```python
-from amplifier_collections import CollectionLock, CollectionLockEntry
-from dataclasses import dataclass
-
-class CollectionLock:
-    """Manage collection lock file."""
-
-    def __init__(self, lock_path: Path):
-        """Initialize with lock file path.
-
-        Args:
-            lock_path: Path to collections.lock file (app-specific)
-        """
-
-    def add_entry(
-        self,
-        name: str,
-        source: str,
-        commit: str | None,
-        path: Path
-    ) -> None:
-        """Add or update collection entry.
-
-        Args:
-            name: Collection name
-            source: Git source URI
-            commit: Git commit SHA (None if not git)
-            path: Installation path
-
-        If collection already exists, updates it (overwrites).
-        """
-
-    def remove_entry(self, collection_name: str) -> None:
-        """Remove collection entry.
-
-        No-op if collection not in lock file.
-        """
-
-    def get_entry(self, collection_name: str) -> CollectionLockEntry | None:
-        """Get collection entry by name.
-
-        Returns:
-            Entry if found, None otherwise
-        """
-
-    def list_entries(self) -> list[CollectionLockEntry]:
-        """List all installed collections.
-
-        Returns:
-            List of all lock entries
-        """
-
-    def is_installed(self, name: str) -> bool:
-        """Check if collection is in lock file.
-
-        Args:
-            name: Collection name
-
-        Returns:
-            True if collection is tracked
-        """
-
-@dataclass
-class CollectionLockEntry:
-    """Single entry in collection lock file."""
-
-    name: str
-    source: str
-    commit: str | None  # Git commit SHA for reproducibility
-    path: str           # Installation path as string (for JSON)
-    installed_at: str   # ISO 8601 timestamp
-```
 
 ---
 
@@ -802,13 +504,7 @@ except CollectionMetadataError as e:
 
 ### Validation
 
-**Required metadata**:
-- `pyproject.toml` must exist
-- `[project]` section must have: `name`, `version`, `description`
-
-**Optional metadata**:
-- `[tool.amplifier.collection]` section (validated if present)
-- `[project.urls]` section (validated if present)
+**See:** [Validation Rules Specification](docs/SPECIFICATION.md#validation-rules) for complete requirements.
 
 ```python
 # Invalid collection (missing pyproject.toml)
@@ -865,16 +561,11 @@ Applications provide collection **policy**:
 
 **Why InstallSourceProtocol?**
 
-Different applications need different installation mechanisms:
-
-| Application | Source Type | Mechanism |
-|-------------|-------------|-----------|
-| CLI | Git repositories | uv pip install from git |
-| Web | HTTP zip files | Download + extract |
-| Enterprise | Artifact server | Corporate registry API |
-| Air-gapped | Local mirror | File copy from cache |
+Different applications need different installation mechanisms (CLI uses git, Web uses HTTP, Enterprise uses artifact servers, Air-gapped uses local mirrors).
 
 By accepting any `InstallSourceProtocol` implementation, the library remains application-agnostic.
+
+**See:** [Protocol Contracts Specification](docs/SPECIFICATION.md#protocol-contracts) for complete contract requirements.
 
 ---
 
