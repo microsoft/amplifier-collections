@@ -57,7 +57,7 @@ print(f"Found {len(resources.agents)} agents")
 # Install new collection
 from amplifier_module_resolution import GitSource
 
-lock = CollectionLock(lock_file_path=Path(".amplifier/collections.lock"))
+lock = CollectionLock(lock_path=Path(".amplifier/collections.lock"))
 source = GitSource("git+https://github.com/user/my-collection@v1.0.0")
 
 await install_collection(
@@ -277,7 +277,7 @@ for agent in resources.agents:
 #### install_collection
 
 ```python
-from amplifier_collections import install_collection, CollectionLock, InstallError
+from amplifier_collections import install_collection, CollectionLock, CollectionInstallError
 from amplifier_module_resolution import GitSource
 from pathlib import Path
 
@@ -285,7 +285,7 @@ from pathlib import Path
 source = GitSource("git+https://github.com/user/collection@v1.0.0")
 
 # Create lock file manager
-lock = CollectionLock(lock_file_path=Path(".amplifier/collections.lock"))
+lock = CollectionLock(lock_path=Path(".amplifier/collections.lock"))
 
 # Install collection
 try:
@@ -295,7 +295,7 @@ try:
         lock=lock
     )
     print(f"Installed {metadata.name} v{metadata.version}")
-except InstallError as e:
+except CollectionInstallError as e:
     print(f"Installation failed: {e.message}")
 ```
 
@@ -304,8 +304,7 @@ except InstallError as e:
 2. Validate `pyproject.toml` exists
 3. Parse metadata
 4. Discover resources
-5. Install scenario tools (if any)
-6. Add entry to lock file
+5. Add entry to lock file (if lock provided)
 
 #### uninstall_collection
 
@@ -320,9 +319,8 @@ await uninstall_collection(
 ```
 
 **Uninstallation process**:
-1. Uninstall scenario tools (if any)
-2. Remove collection directory
-3. Remove lock entry
+1. Remove collection directory
+2. Remove lock entry (if lock provided)
 
 ### Lock File Management
 
@@ -331,35 +329,33 @@ await uninstall_collection(
 ```python
 from amplifier_collections import CollectionLock, CollectionLockEntry
 from pathlib import Path
-from datetime import datetime
 
 class CollectionLock:
     """Manage collection lock file."""
 
-    def __init__(self, lock_file_path: Path):
+    def __init__(self, lock_path: Path):
         """Initialize with lock file path."""
 
 # Create lock manager
-lock = CollectionLock(lock_file_path=Path(".amplifier/collections.lock"))
+lock = CollectionLock(lock_path=Path(".amplifier/collections.lock"))
 
-# Add entry
-entry = CollectionLockEntry(
+# Add entry (direct parameters - simpler than constructing object)
+lock.add_entry(
     name="my-collection",
-    version="1.0.0",
     source="git+https://github.com/user/my-collection@v1.0.0",
-    path=Path(".amplifier/collections/my-collection"),
-    installed_at=datetime.now()
+    commit="abc123def456",  # Git commit SHA (or None if not git)
+    path=Path(".amplifier/collections/my-collection")
 )
-lock.add_entry(entry)
 
 # Get entry
 entry = lock.get_entry("my-collection")
 if entry:
     print(f"Installed: {entry.installed_at}")
+    print(f"Commit: {entry.commit}")
 
 # List all entries
 for entry in lock.list_entries():
-    print(f"{entry.name} v{entry.version}")
+    print(f"{entry.name} @ {entry.commit[:7]}")
 
 # Remove entry
 lock.remove_entry("my-collection")
@@ -476,7 +472,7 @@ class HttpZipSource:
             temp_zip.unlink()
 
 # Use custom source
-lock = CollectionLock(lock_file_path=Path(".amplifier/collections.lock"))
+lock = CollectionLock(lock_path=Path(".amplifier/collections.lock"))
 source = HttpZipSource("https://cdn.example.com/collections/my-collection-v1.0.0.zip")
 
 await install_collection(
@@ -557,8 +553,8 @@ Lock file tracks installed collections:
   "collections": {
     "my-collection": {
       "name": "my-collection",
-      "version": "1.0.0",
       "source": "git+https://github.com/user/my-collection@v1.0.0",
+      "commit": "abc123def456789...",
       "path": "/home/user/.amplifier/collections/my-collection",
       "installed_at": "2025-10-28T10:30:00Z"
     }
@@ -656,17 +652,83 @@ def discover_collection_resources(collection_path: Path) -> CollectionResources:
         >>> print(f"Profiles: {[p.stem for p in resources.profiles]}")
         Profiles: ['optimized', 'debug']
     """
+
+def list_profiles(collection_path: Path) -> list[str]:
+    """List profile names in collection (convenience helper).
+
+    Args:
+        collection_path: Path to collection directory
+
+    Returns:
+        List of profile names (without .md extension)
+
+    Example:
+        >>> profiles = list_profiles(Path("~/.amplifier/collections/foundation"))
+        >>> print(profiles)
+        ['base', 'foundation', 'production', 'test']
+    """
+
+def list_agents(collection_path: Path) -> list[str]:
+    """List agent names in collection (convenience helper).
+
+    Args:
+        collection_path: Path to collection directory
+
+    Returns:
+        List of agent names (without .md extension)
+
+    Example:
+        >>> agents = list_agents(Path("~/.amplifier/collections/developer-expertise"))
+        >>> print(agents)
+        ['bug-hunter', 'modular-builder', 'researcher', 'zen-architect']
+    """
+```
+
+### Utilities
+
+```python
+from amplifier_collections import extract_collection_name_from_path
+
+def extract_collection_name_from_path(search_path: Path) -> str | None:
+    """Extract collection metadata name from path containing /collections/.
+
+    Reads pyproject.toml to get authoritative name (not directory name).
+    Handles both flat and nested packaging structures.
+
+    Args:
+        search_path: Path containing "collections" component
+                    (e.g., ~/.amplifier/collections/dir-name/profiles/)
+
+    Returns:
+        Collection metadata name (e.g., "design-intelligence")
+        or None if not a collection path or metadata unreadable
+
+    Example:
+        >>> # Directory name may differ from metadata name
+        >>> path = Path("~/.amplifier/collections/amplifier-collection-design-intelligence/profiles/")
+        >>> extract_collection_name_from_path(path)
+        'design-intelligence'  # From pyproject.toml, not directory name
+
+        >>> # Non-collection path
+        >>> path = Path("~/.amplifier/profiles/")
+        >>> extract_collection_name_from_path(path)
+        None
+
+    Note:
+        After app layer directory normalization, directory name should equal metadata name.
+        This function is defensive and always reads metadata regardless.
+    """
 ```
 
 ### Installation Management
 
 ```python
-from amplifier_collections import install_collection, uninstall_collection, InstallError
+from amplifier_collections import install_collection, uninstall_collection, CollectionInstallError
 
 async def install_collection(
     source: InstallSourceProtocol,
     target_dir: Path,
-    lock: CollectionLock
+    lock: CollectionLock | None = None
 ) -> CollectionMetadata:
     """Install collection from source.
 
@@ -675,19 +737,18 @@ async def install_collection(
     2. Validate pyproject.toml exists
     3. Parse metadata
     4. Discover resources
-    5. Install scenario tools (if any)
-    6. Add entry to lock file
+    5. Add entry to lock file (if lock provided)
 
     Args:
         source: Installation source implementing InstallSourceProtocol
         target_dir: Directory to install into (must not exist)
-        lock: Lock file manager
+        lock: Optional lock file manager
 
     Returns:
         CollectionMetadata from installed collection
 
     Raises:
-        InstallError: If installation fails at any step
+        CollectionInstallError: If installation fails at any step
 
     Example:
         >>> from amplifier_module_resolution import GitSource
@@ -699,22 +760,21 @@ async def install_collection(
 async def uninstall_collection(
     collection_name: str,
     collections_dir: Path,
-    lock: CollectionLock
+    lock: CollectionLock | None = None
 ) -> None:
     """Uninstall collection.
 
     Process:
-    1. Uninstall scenario tools (if any)
-    2. Remove collection directory
-    3. Remove lock entry
+    1. Remove collection directory
+    2. Remove lock entry (if lock provided)
 
     Args:
         collection_name: Name of collection to remove
         collections_dir: Parent directory containing collections
-        lock: Lock file manager
+        lock: Optional lock file manager
 
     Raises:
-        InstallError: If uninstallation fails
+        CollectionInstallError: If uninstallation fails
 
     Example:
         >>> await uninstall_collection("my-collection", Path("..."), lock)
@@ -725,20 +785,32 @@ async def uninstall_collection(
 
 ```python
 from amplifier_collections import CollectionLock, CollectionLockEntry
-from datetime import datetime
+from dataclasses import dataclass
 
 class CollectionLock:
     """Manage collection lock file."""
 
-    def __init__(self, lock_file_path: Path):
+    def __init__(self, lock_path: Path):
         """Initialize with lock file path.
 
         Args:
-            lock_file_path: Path to collections.lock file (app-specific)
+            lock_path: Path to collections.lock file (app-specific)
         """
 
-    def add_entry(self, entry: CollectionLockEntry) -> None:
+    def add_entry(
+        self,
+        name: str,
+        source: str,
+        commit: str | None,
+        path: Path
+    ) -> None:
         """Add or update collection entry.
+
+        Args:
+            name: Collection name
+            source: Git source URI
+            commit: Git commit SHA (None if not git)
+            path: Installation path
 
         If collection already exists, updates it (overwrites).
         """
@@ -763,15 +835,25 @@ class CollectionLock:
             List of all lock entries
         """
 
-class CollectionLockEntry(BaseModel):
+    def is_installed(self, name: str) -> bool:
+        """Check if collection is in lock file.
+
+        Args:
+            name: Collection name
+
+        Returns:
+            True if collection is tracked
+        """
+
+@dataclass
+class CollectionLockEntry:
     """Single entry in collection lock file."""
-    model_config = ConfigDict(frozen=True)
 
     name: str
-    version: str
-    source: str  # Original source URI
-    path: Path
-    installed_at: datetime
+    source: str
+    commit: str | None  # Git commit SHA for reproducibility
+    path: str           # Installation path as string (for JSON)
+    installed_at: str   # ISO 8601 timestamp
 ```
 
 ---
@@ -781,7 +863,12 @@ class CollectionLockEntry(BaseModel):
 ### Exceptions
 
 ```python
-from amplifier_collections import CollectionError, InstallError, MetadataError
+from amplifier_collections import (
+    CollectionError,
+    CollectionInstallError,
+    CollectionMetadataError,
+    CollectionNotFoundError,
+)
 
 # Base exception
 class CollectionError(Exception):
@@ -791,17 +878,21 @@ class CollectionError(Exception):
         self.context = context or {}
 
 # Installation errors
-class InstallError(CollectionError):
+class CollectionInstallError(CollectionError):
     """Collection installation failed."""
 
 # Metadata errors
-class MetadataError(CollectionError):
+class CollectionMetadataError(CollectionError):
     """Invalid or missing collection metadata."""
+
+# Not found errors
+class CollectionNotFoundError(CollectionError):
+    """Collection not found in search paths."""
 
 # Usage
 try:
     metadata = CollectionMetadata.from_pyproject(path / "pyproject.toml")
-except MetadataError as e:
+except CollectionMetadataError as e:
     print(f"Error: {e.message}")
     print(f"File: {e.context.get('file')}")
 ```
@@ -819,10 +910,10 @@ except MetadataError as e:
 ```python
 # Invalid collection (missing pyproject.toml)
 resources = discover_collection_resources(Path("/invalid/path"))
-# Raises: MetadataError("Collection missing pyproject.toml")
+# Raises: CollectionMetadataError("Collection missing pyproject.toml")
 
 # Invalid metadata (missing required field)
-# Raises: MetadataError("Required field missing: name")
+# Raises: CollectionMetadataError("Required field missing: name")
 ```
 
 ---
@@ -1011,6 +1102,11 @@ class CollectionMetadata(BaseModel):
 ## Future Enhancements
 
 **Only add when proven needed through real usage**:
+
+### Scenario Tool Installation
+- **Add when**: Users request automatic scenario tool installation
+- **Add how**: Run `uv tool install` for each discovered scenario tool
+- **Why not now**: YAGNI - apps can handle if needed (policy), library focuses on discovery (mechanism)
 
 ### Dependency Resolution
 - **Add when**: Users request automatic dependency installation
