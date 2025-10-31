@@ -29,52 +29,26 @@ This guide teaches you how to package profiles, agents, context, scenario tools,
 
 Collections follow a **well-known directory convention**. Resources are auto-discovered based on directory presence - no manifest file required.
 
-```
-my-collection/
-  pyproject.toml              # Metadata (required)
+**→ See [Collection Structure Specification](SPECIFICATION.md#collection-directory-structure) for complete technical contract**
 
-  profiles/                   # Profile definitions
-    optimized.md
-    debug.md
+**Key directories:**
+- `profiles/` - Profile definitions (*.md files)
+- `agents/` - Agent definitions (*.md files)
+- `context/` - Shared knowledge (**/*.md recursive)
+- `scenario-tools/` - CLI tools (subdirectories)
+- `modules/` - Amplifier modules (Python packages)
 
-  agents/                     # Agent definitions
-    analyzer.md
-    optimizer.md
-
-  context/                    # Shared knowledge
-    patterns.md
-    examples/
-      example1.md
-
-  scenario-tools/             # Sophisticated CLI tools
-    my_tool/
-      main.py
-      pyproject.toml
-
-  modules/                    # Amplifier modules
-    hooks-custom/
-      __init__.py
-      pyproject.toml
-
-  README.md                   # Collection documentation
-```
-
-**Convention over configuration**: Amplifier auto-discovers resources by checking for well-known directories:
-
-1. Check if `profiles/` directory exists → glob `*.md` files
-2. Check if `agents/` directory exists → glob `*.md` files
-3. Check if `context/` directory exists → glob `**/*.md` recursively
-4. Check if `scenario-tools/` directory exists → glob `*/` directories
-5. Check if `modules/` directory exists → glob `*/` directories
-
-**No configuration file** listing resources - structure IS the configuration.
+**Convention over configuration**: Structure IS the configuration - no manifest file needed.
 
 ---
 
 ## Collection Metadata
 
-Every collection requires a `pyproject.toml` file with metadata:
+Every collection requires a `pyproject.toml` file with metadata.
 
+**→ See [pyproject.toml Format Specification](SPECIFICATION.md#pyprojecttoml-format) for complete field reference**
+
+**Example:**
 ```toml
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -84,52 +58,18 @@ build-backend = "setuptools.build_meta"
 name = "my-collection"
 version = "1.0.0"
 description = "My expertise collection"
-readme = "README.md"
-requires-python = ">=3.11"
-license = "MIT"
-authors = [
-    {name = "Your Name"}
-]
-
-[project.urls]
-homepage = "https://docs.example.com/my-collection"
-repository = "https://github.com/user/my-collection"
-
-[tool.setuptools]
-packages = {find = {}}
-
-[tool.setuptools.package-data]
-my_collection = ["*.toml", "**/*.md"]
 
 [tool.amplifier.collection]
 author = "Your Name"
-capabilities = [
-    "What does this collection enable?",
-    "What expertise does it provide?"
-]
+capabilities = ["What this enables"]
 
 [tool.amplifier.collection.requires]
-foundation = "^1.0.0"  # Optional dependencies
+foundation = "^1.0.0"  # Dependencies
 ```
 
-**Field reference**:
+**Required fields:** `name`, `version`, `description` (in `[project]` section)
 
-| Section | Field | Required | Purpose |
-|---------|-------|----------|---------|
-| `[project]` | `name` | Yes | Collection identifier (use hyphens) |
-| `[project]` | `version` | Yes | Semantic version |
-| `[project]` | `description` | Yes | One-line description |
-| `[project.urls]` | `homepage` | No | Documentation URL |
-| `[project.urls]` | `repository` | No | Source repository URL |
-| `[tool.amplifier.collection]` | `author` | No | Creator name |
-| `[tool.amplifier.collection]` | `capabilities` | No | What the collection enables |
-| `[tool.amplifier.collection.requires]` | (various) | No | Dependencies (collection: version constraint) |
-
-**Why pyproject.toml?**
-- Standard Python packaging format
-- Enables installation via `uv` and `pip`
-- Familiar to Python developers
-- Can be installed with `uv tool install` for scenario tools
+**Why pyproject.toml?** Standard Python packaging enables installation via `uv` and `pip`.
 
 ---
 
@@ -453,26 +393,18 @@ amplifier collection add git+https://github.com/user/my-collection@main
 
 ## Dependency Declarations
 
-Collections can declare dependencies on other collections:
+Collections can declare dependencies on other collections.
 
+**→ See [Dependency Constraints Specification](SPECIFICATION.md#dependency-constraints) for complete constraint syntax**
+
+**Example:**
 ```toml
 [tool.amplifier.collection.requires]
-foundation = "^1.0.0"     # Compatible with 1.x.x (semver caret)
-toolkit = "~1.2.0"        # Compatible with 1.2.x (semver tilde)
-other = ">=1.0.0,<2.0.0"  # Range
+foundation = "^1.0.0"     # Compatible with 1.x.x
+toolkit = "~1.2.0"        # Compatible with 1.2.x
 ```
 
-**Current behavior**:
-- Dependencies are parsed and stored in metadata
-- Applications can read dependency information
-- **Not automatically installed** - users must install dependencies manually
-- Future versions may add automatic dependency resolution
-
-**Constraint syntax** (follows Python packaging / semver):
-- `^1.0.0` - Compatible with 1.x.x (caret operator)
-- `~1.2.0` - Compatible with 1.2.x (tilde operator)
-- `>=1.0.0,<2.0.0` - Explicit range
-- `==1.0.0` - Exact version (not recommended, limits flexibility)
+**Current behavior:** Dependencies parsed but NOT auto-installed. Users install dependencies manually.
 
 ---
 

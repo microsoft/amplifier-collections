@@ -136,19 +136,9 @@ context:
 
 ### Search Path Precedence
 
-When resolving collection names, Amplifier applications typically search in precedence order (highest first):
+Collections resolve in precedence order: Project → User → Bundled (highest to lowest).
 
-1. **Project collections**: `.amplifier/collections/` (or app-specific)
-2. **User collections**: `~/.amplifier/collections/` (or app-specific)
-3. **Bundled collections**: Shipped with application
-
-**Example**:
-```bash
-# Project overrides user overrides bundled
-.amplifier/collections/foundation/profiles/base.md     # Found first
-~/.amplifier/collections/foundation/profiles/base.md   # Ignored
-<bundled>/data/collections/foundation/profiles/base.md # Ignored
-```
+**See:** [Search Path Specification](SPECIFICATION.md#search-path-precedence) for complete details.
 
 **Note**: Exact paths depend on your application's configuration.
 

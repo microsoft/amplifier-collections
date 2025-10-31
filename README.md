@@ -8,11 +8,12 @@ amplifier-collections provides collection lifecycle management through filesyste
 
 ## Documentation
 
-- **[Quick Start](#quick-start)** - Get started in 5 minutes
+- **[Quick Start](#quick-start)** - Get started in 5 minutes with Python API
 - **[API Reference](#api-reference)** - Complete Python API documentation
-- **[User Guide](docs/USER_GUIDE.md)** - Using collections (installing, using resources, troubleshooting)
-- **[Collection Authoring Guide](docs/AUTHORING.md)** - Creating your own collections
-- **[Design Philosophy](#design-philosophy)** - System design and architecture
+- **[User Guide](docs/USER_GUIDE.md)** - Using collections (end-user guide)
+- **[Collection Authoring](docs/AUTHORING.md)** - Creating collections (author guide)
+- **[Specification](docs/SPECIFICATION.md)** - Technical contracts and formats
+- **[Design Philosophy](#design-philosophy)** - Library design decisions
 
 ---
 
@@ -81,73 +82,21 @@ await install_collection(
 
 ## What This Library Provides
 
+**→ See [Specification](docs/SPECIFICATION.md) for complete technical contracts**
+
 ### Convention Over Configuration
 
-Collections use **directory structure** to define resources (no manifest file required):
+Collections use **directory structure** to define resources (no manifest file required). The library auto-discovers profiles, agents, context, scenario tools, and modules by checking for well-known directories.
 
-```
-my-collection/
-  pyproject.toml          # Metadata (required)
-
-  profiles/               # Auto-discovered if exists
-    optimized.md
-    debug.md
-
-  agents/                 # Auto-discovered if exists
-    analyzer.md
-    optimizer.md
-
-  context/                # Auto-discovered if exists
-    patterns.md
-    examples/
-      example1.md
-
-  scenario-tools/         # Auto-discovered if exists
-    my_tool/
-      main.py
-
-  modules/                # Auto-discovered if exists
-    hooks-custom/
-      __init__.py
-
-  README.md               # Collection documentation
-```
-
-**Discovery process**:
-1. Check if `profiles/` directory exists → glob `*.md` files
-2. Check if `agents/` directory exists → glob `*.md` files
-3. Check if `context/` directory exists → glob `**/*.md` recursively
-4. Check if `scenario-tools/` directory exists → glob `*/` directories
-5. Check if `modules/` directory exists → glob `*/` directories
-
-**No configuration file** listing resources - structure IS the configuration.
+**See:** [Collection Structure Specification](docs/SPECIFICATION.md#collection-directory-structure)
 
 ### Search Path Precedence
 
-Collections resolve in precedence order (highest first):
+Collections resolve in precedence order (highest first): Project → User → Bundled.
 
-1. **Project** (`.amplifier/collections/`) - Workspace-specific
-2. **User** (`~/.amplifier/collections/`) - User-installed
-3. **Bundled** (app-provided) - System collections
+Applications define search paths; library provides resolution mechanism.
 
-**Apps inject paths**; library resolves:
-
-```python
-# CLI paths
-cli_paths = [
-    Path(__file__).parent / "data" / "collections",  # Bundled
-    Path.home() / ".amplifier" / "collections",      # User
-    Path(".amplifier/collections"),                   # Project
-]
-
-# Web paths (different conventions)
-web_paths = [
-    Path("/var/amplifier/system/collections"),       # Bundled
-    Path(f"/var/amplifier/workspaces/{workspace_id}/collections"),  # Project
-]
-
-resolver = CollectionResolver(search_paths=paths)
-```
+**See:** [Search Path Specification](docs/SPECIFICATION.md#search-path-precedence)
 
 ### Pluggable Installation Sources
 
@@ -275,12 +224,7 @@ for agent in resources.agents:
     print(f"Agent: {agent.name}")
 ```
 
-**Discovery algorithm**:
-- `profiles/`: `*.md` files
-- `agents/`: `*.md` files
-- `context/`: `**/*.md` recursively
-- `scenario-tools/`: `*/` subdirectories
-- `modules/`: `*/` subdirectories with `__init__.py`
+**See:** [Discovery Algorithm Specification](docs/SPECIFICATION.md#discovery-algorithm)
 
 ### Installation
 
@@ -523,60 +467,9 @@ def test_collection_discovery():
 
 ---
 
-## Collection Metadata Format
-
-### pyproject.toml
-
-Collections declare metadata in standard Python packaging format:
-
-```toml
-[project]
-name = "my-collection"                    # Required: Collection identifier
-version = "1.0.0"                         # Required: Semantic version
-description = "My expertise collection"   # Required: One-line description
-
-[project.urls]
-homepage = "https://docs.example.com"     # Optional: Documentation URL
-repository = "https://github.com/..."     # Optional: Source repository
-
-[tool.amplifier.collection]
-author = "developer-name"                 # Optional: Creator name
-capabilities = [                          # Optional: What this enables
-    "What this collection enables",
-    "What expertise it provides"
-]
-requires = {                              # Optional: Dependencies
-    foundation = "^1.0.0",
-    toolkit = "^1.2.0"
-}
-```
-
-**Parsing**: Uses stdlib `tomllib` (Python 3.11+) with Pydantic validation.
-
-### collections.lock
-
-Lock file tracks installed collections:
-
-```json
-{
-  "version": "1.0",
-  "collections": {
-    "my-collection": {
-      "name": "my-collection",
-      "source": "git+https://github.com/user/my-collection@v1.0.0",
-      "commit": "abc123def456789...",
-      "path": "/home/user/.amplifier/collections/my-collection",
-      "installed_at": "2025-10-28T10:30:00Z"
-    }
-  }
-}
-```
-
-**Format**: JSON for human readability and tool compatibility.
-
----
-
 ## API Reference
+
+**→ See [Specification](docs/SPECIFICATION.md) for collection format details**
 
 ### CollectionResolver
 
