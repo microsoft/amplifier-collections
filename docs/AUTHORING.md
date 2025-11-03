@@ -43,6 +43,62 @@ Collections follow a **well-known directory convention**. Resources are auto-dis
 
 ---
 
+## Writing Profiles and Agents
+
+Profiles and agents are Markdown documents with YAML front matter. The front matter
+defines everything the loader needs; the remaining Markdown is optional narrative
+for humans.
+
+**Profiles (`profiles/*.md`):**
+
+```markdown
+---
+profile:
+  name: toolkit-dev
+  version: 1.0.0
+  description: Toolkit development configuration
+  extends: foundation
+session:
+  orchestrator:
+    module: loop-streaming
+    source: git+https://github.com/microsoft/amplifier-module-loop-streaming@main
+  context:
+    module: context-simple
+agents:
+  dirs:
+    - ./agents
+---
+
+# Optional Markdown body
+```
+
+- Place every operational field (session, tools, hooks, providers, ui, etc.) inside the YAML block.
+- Avoid “example” YAML code fences—those are ignored during parsing.
+- Profiles inherit the currently active provider unless you add an explicit override.
+
+**Agents (`agents/*.md`):**
+
+```markdown
+---
+name: tool-builder
+description: Agent that helps build scenario tools
+model: inherit
+capabilities:
+  - tool-scaffolding
+---
+
+# System instructions here...
+```
+
+- Required fields: `name`, `description`.
+- Recommended: `model: inherit` plus `capabilities`/`keywords` to aid discovery.
+
+When in doubt, copy an existing shipped profile or agent (for example, the Toolkit
+collection) and adjust the front matter fields instead of moving configuration
+into the prose section.
+
+---
+
 ## Collection Metadata
 
 Every collection requires a `pyproject.toml` file with metadata.

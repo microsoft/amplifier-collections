@@ -88,6 +88,10 @@ await install_collection(
 
 Collections use **directory structure** to define resources (no manifest file required). The library auto-discovers profiles, agents, context, scenario tools, and modules by checking for well-known directories.
 
+Profiles and agents must start with YAML front matter as described in the
+[Specification](docs/SPECIFICATION.md#profile-and-agent-file-schema); configuration
+inside code fences is ignored.
+
 **See:** [Collection Structure Specification](docs/SPECIFICATION.md#collection-directory-structure)
 
 ### Search Path Precedence

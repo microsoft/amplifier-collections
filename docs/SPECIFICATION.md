@@ -100,6 +100,36 @@ The amplifier-collections library discovers resources using filesystem conventio
 
 ---
 
+## Profile and Agent File Schema
+
+Profiles and agents are authored as Markdown files but MUST begin with a YAML
+front matter block delimited by `---` lines. The loader parses this front matter
+into strongly typed Pydantic models; narrative Markdown that only shows “example”
+YAML inside code fences is rejected.
+
+**Profile file requirements (`profiles/*.md`):**
+
+- First non-empty line is `---`.
+- YAML front matter defines a `profile` block (`name`, `version`, `description`, `extends`), followed by optional sections such as `session`, `tools`, `hooks`, `providers`, `agents`, `ui`, etc.
+- After the closing `---`, additional Markdown content is optional and is exposed to the user verbatim.
+- Profile configuration fields map one-to-one with the public `Profile` model in `amplifier_profiles`.
+
+**Agent file requirements (`agents/*.md`):**
+
+- First non-empty line is `---`.
+- YAML front matter defines `name` and `description`. Recommended optional fields: `model` (usually `inherit`), `capabilities`, `keywords`, `priority`, `config`.
+- Body Markdown is treated as the agent’s system instructions.
+
+**Validation notes:**
+
+- Keys outside the documented schema raise validation errors.
+- Omit provider overrides unless required; profiles inherit the active provider by default.
+- Keep configuration in the front matter—do not place operational YAML in code blocks.
+
+This schema matches the shipped collections (`toolkit`, `design-intelligence`, etc.) and is enforced during smoke tests.
+
+---
+
 ## pyproject.toml Format
 
 Every collection MUST have `pyproject.toml` at its root for metadata.
