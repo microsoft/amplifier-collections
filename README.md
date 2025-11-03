@@ -125,6 +125,11 @@ Apps provide implementation; library uses the protocol.
 
 **See:** [pyproject.toml Format Specification](docs/SPECIFICATION.md#pyprojecttoml-format) for complete field reference and validation rules.
 
+> **Naming tip:** `[project].name` becomes the collection ID surfaced by the CLI.
+> Use a concise slug such as `toolkit` or `design-intelligence` and avoid
+> repository prefixes (`amplifier-collection-`). This ensures commands like
+> `amplifier collection show <name>` match user expectations.
+
 ```python
 from amplifier_collections import CollectionMetadata
 from pathlib import Path

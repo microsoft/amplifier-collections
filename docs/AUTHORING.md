@@ -130,6 +130,12 @@ capabilities = [
 EOF
 ```
 
+> **Naming tip:** The value of `[project].name` becomes the collection ID that end
+> users reference via the CLI (`amplifier collection show <name>`). Keep it short
+> and drop repository prefixes such as `amplifier-collection-`. For example, the
+> repository `amplifier-collection-toolkit` uses `[project].name = "toolkit"` so
+> users run `amplifier collection show toolkit`.
+
 **Key sections:**
 
 - `[build-system]` - Required for pip/uv installation

@@ -155,6 +155,11 @@ toolkit = "~1.2.0"
 - Validated with Pydantic models
 - Frozen models prevent accidental modification
 
+**Naming guidance:** `[project].name` is the canonical collection identifier.
+Choose a short, hyphenated slug (e.g., `toolkit`, `design-intelligence`) and
+avoid repository prefixes such as `amplifier-collection-`. The CLI exposes this
+value directly in commands like `amplifier collection show <name>`.
+
 ---
 
 ## Dependency Constraints
