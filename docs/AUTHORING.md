@@ -32,9 +32,10 @@ Collections follow a **well-known directory convention**. Resources are auto-dis
 **→ See [Collection Structure Specification](SPECIFICATION.md#collection-directory-structure) for complete technical contract**
 
 **Key directories:**
-- `profiles/` - Profile definitions (*.md files)
-- `agents/` - Agent definitions (*.md files)
-- `context/` - Shared knowledge (**/*.md recursive)
+
+- `profiles/` - Profile definitions (\*.md files)
+- `agents/` - Agent definitions (\*.md files)
+- `context/` - Shared knowledge (\*_/_.md recursive)
 - `scenario-tools/` - CLI tools (subdirectories)
 - `modules/` - Amplifier modules (Python packages)
 
@@ -49,6 +50,7 @@ Every collection requires a `pyproject.toml` file with metadata.
 **→ See [pyproject.toml Format Specification](SPECIFICATION.md#pyprojecttoml-format) for complete field reference**
 
 **Example:**
+
 ```toml
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -129,6 +131,7 @@ EOF
 ```
 
 **Key sections:**
+
 - `[build-system]` - Required for pip/uv installation
 - `[tool.setuptools]` - Package discovery configuration
 - `[tool.setuptools.package-data]` - Include data files (markdown, toml)
@@ -136,77 +139,85 @@ EOF
 
 ### Step 3: Add Package Structure
 
-Collections follow **standard Python packaging**. Create a package directory (hyphens → underscores):
+Collections follow **standard Python packaging**. Create a package directory (hyphens → underscores) alongside the resource directories.
 
 **→ See [Package Structure Specification](SPECIFICATION.md#package-structure-for-installation) for complete technical contract**
 
 ```bash
 # Create package directory (hyphens → underscores!)
 PACKAGE_NAME=$(python3 -c "print('my-collection'.replace('-', '_'))")
-mkdir $PACKAGE_NAME  # my_collection
+mkdir -p $PACKAGE_NAME  # my_collection
 
-# Minimal __init__.py
+# Minimal __init__.py (keeps package importable)
 cat > $PACKAGE_NAME/__init__.py << 'EOF'
-"""My Collection - Data package."""
-__version__ = "1.0.0"
+"""My Collection - resource package."""
+__all__ = ()
 EOF
 
-# Copy pyproject.toml into package for runtime discovery
+# Copy pyproject.toml into package for runtime discovery metadata
 cp pyproject.toml $PACKAGE_NAME/
-
-# Move resource directories into package
-mv profiles agents context $PACKAGE_NAME/
 
 # Create MANIFEST.in to include data files in wheels
 cat > MANIFEST.in << 'EOF'
-# Include metadata files in wheel
+# Metadata
 include LICENSE
+include CODE_OF_CONDUCT.md
+include SECURITY.md
+include SUPPORT.md
 include README.md
 include pyproject.toml
 
-# Include all collection data from package
-recursive-include my_collection *.md
-recursive-include my_collection *.toml
+# Collection resources (remain at repo root)
+recursive-include agents *
+recursive-include profiles *
+recursive-include context *
+recursive-include scenario-tools *
+recursive-include templates *
+recursive-include docs *
+
+# Package metadata copied into the wheel
+recursive-include my_collection *.py *.toml
 EOF
 ```
 
-**Final structure**:
+**Final structure** (resources stay at the repository root):
+
 ```
-my-collection/                  # Git repo root
-  pyproject.toml                # Build configuration (at root)
-  MANIFEST.in                   # Data file inclusion rules
+my-collection/
+  pyproject.toml                   # Build configuration
+  MANIFEST.in
   README.md
+  LICENSE …                        # Metadata files
 
-  my_collection/                # Package directory (hyphens → underscores!)
-    __init__.py                 # Python package marker
-    pyproject.toml              # Copy for runtime discovery
+  agents/                          # Collection resources
+  profiles/
+  context/
+  scenario-tools/
+  templates/
+  docs/
 
-    profiles/                   # Collection resources
-      my-profile.md
-    agents/
-      my-agent.md
-    context/
-      expertise.md
+  my_collection/                   # Python package (hyphens → underscores)
+    __init__.py
+    pyproject.toml                 # Copied from root for runtime discovery
 ```
 
-**Why this structure:**
-- **Standard Python packaging**: Works with `pip`, `uv`, and all Python tools
-- **Nested structure**: When installed via `uv pip install`, creates proper package hierarchy
-- **Auto-discovery**: amplifier-collections library finds resources in both flat (git clone) and nested (pip install) structures
-- **No normalization needed**: Structure preserved as Python packaging creates it
+**When installed by users** (`uv pip install git+https://…`):
 
-**When installed by users**:
 ```
-~/.amplifier/collections/
-  my-collection/              # Installation target
-    my_collection/            # Package directory (automatic from pip)
-      pyproject.toml
-      profiles/
-      agents/
-      context/
+~/.amplifier/collections/my-collection/
+  agents/
+  profiles/
+  context/
+  scenario-tools/
+  templates/
+  docs/
+  my_collection/
+    __init__.py
+    pyproject.toml
+  *.dist-info/
 ```
 
-Amplifier automatically discovers resources regardless of structure depth.
+The CLI relies on this layout to locate resources after installation—no manual renaming or git fallback required.
 
 **See**: [amplifier-collection-design-intelligence](https://github.com/microsoft/amplifier-collection-design-intelligence) for complete working example.
 
@@ -214,7 +225,7 @@ Amplifier automatically discovers resources regardless of structure depth.
 
 ## Adding Resources
 
-### Add Profiles (profiles/*.md)
+### Add Profiles (profiles/\*.md)
 
 Profiles define capability configurations:
 
@@ -225,23 +236,26 @@ description: My specialized profile
 ---
 
 # Configuration
+
 session:
-  orchestrator: loop-streaming
-  context: context-persistent
+orchestrator: loop-streaming
+context: context-persistent
 
 providers:
-  - module: provider-anthropic
-    source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
-    config:
-      model: claude-opus-4-1
+
+- module: provider-anthropic
+  source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+  config:
+  model: claude-opus-4-1
 
 context:
-  - @my-collection:context/expertise.md
+
+- @my-collection:context/expertise.md
 ```
 
 **See**: [Profile Authoring Guide](https://github.com/microsoft/amplifier-profiles/blob/main/docs/PROFILE_AUTHORING.md) for complete profile syntax.
 
-### Add Agents (agents/*.md)
+### Add Agents (`agents/*.md`)
 
 Agents define specialized AI personas:
 
@@ -263,7 +277,7 @@ You are a specialized expert in [domain].
 
 **Note**: Agents are loaded via profiles. See [Agent Authoring Guide](https://github.com/microsoft/amplifier-profiles/blob/main/docs/AGENT_AUTHORING.md) for complete agent syntax and delegation patterns.
 
-### Add Context (context/**/*.md)
+### Add Context (`context/**/*.md`)
 
 Context files contain shared knowledge that profiles and agents can reference:
 
@@ -287,7 +301,7 @@ Context files contain shared knowledge that profiles and agents can reference:
 
 **Note**: Context files can be organized in subdirectories - all `**/*.md` files are auto-discovered recursively.
 
-### Add Scenario Tools (scenario-tools/*/)
+### Add Scenario Tools (`scenario-tools/*`)
 
 Scenario tools are sophisticated CLI tools built with AmplifierSession:
 
@@ -308,7 +322,7 @@ scenario-tools/
 
 **See**: [Toolkit Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/TOOLKIT_GUIDE.md) for toolkit utilities available when building scenario tools.
 
-### Add Modules (modules/*/)
+### Add Modules (`modules/*`)
 
 Collections can include custom Amplifier modules (providers, tools, hooks, orchestrators):
 
@@ -330,7 +344,7 @@ Each module needs its own `pyproject.toml` with entry points. See [Module Develo
 
 Create `README.md` at repository root:
 
-```markdown
+````markdown
 # My Collection
 
 ## What This Provides
@@ -349,6 +363,7 @@ amplifier profile use my-collection:my-profile
 # Start session with profile (agents loaded automatically)
 amplifier run "your task here"
 ```
+````
 
 ## Resources
 
@@ -360,7 +375,8 @@ amplifier run "your task here"
 ## Documentation
 
 [Links to additional documentation]
-```
+
+````
 
 ### Step 2: Publish to Git
 
@@ -377,7 +393,7 @@ git push -u origin main
 # Tag releases for versioning
 git tag v1.0.0
 git push origin v1.0.0
-```
+````
 
 ### Step 3: Share
 
@@ -400,6 +416,7 @@ Collections can declare dependencies on other collections.
 **→ See [Dependency Constraints Specification](SPECIFICATION.md#dependency-constraints) for complete constraint syntax**
 
 **Example:**
+
 ```toml
 [tool.amplifier.collection.requires]
 foundation = "^1.0.0"     # Compatible with 1.x.x
@@ -420,6 +437,7 @@ toolkit = "~1.2.0"        # Compatible with 1.2.x
 - **Package `pyproject.toml`** - Copied into package for runtime discovery by amplifier-collections
 
 Include the package copy via:
+
 ```toml
 [tool.setuptools.package-data]
 my_collection = ["*.toml", "**/*.md"]
@@ -428,6 +446,7 @@ my_collection = ["*.toml", "**/*.md"]
 ### Q: Why do collection names use hyphens but package names use underscores?
 
 **A**: Python packaging convention:
+
 - **Collection names**: Use hyphens (e.g., `design-intelligence`)
 - **Package directories**: Use underscores (e.g., `design_intelligence/`)
 
@@ -452,6 +471,7 @@ The amplifier-collections library discovers resources in both structures automat
 **A**: Use **nested structure** (standard Python packaging) as shown in this guide.
 
 **Benefits:**
+
 - Works with all Python tools (`pip`, `uv`, `twine`)
 - Can be published to PyPI if desired
 - Follows industry standards
@@ -501,11 +521,13 @@ Test all resources load correctly, profiles work, agents delegate, etc.
 ### Q: Should I include tests for my collection?
 
 **A**: Recommended for collections with:
+
 - Custom Python modules (hooks, tools, orchestrators)
 - Scenario tools with complex logic
 - Non-trivial agent delegation patterns
 
 Not required for:
+
 - Simple profile/agent/context collections (pure markdown)
 
 ### Q: Can I publish to PyPI?
@@ -521,6 +543,7 @@ python -m twine upload dist/*
 ```
 
 Then users can install via:
+
 ```bash
 uv pip install my-collection
 ```
@@ -534,6 +557,7 @@ However, git-based distribution is more common for Amplifier collections.
 ### 1. Version Your Releases
 
 Use semantic versioning and git tags:
+
 ```bash
 git tag v1.0.0
 git tag v1.1.0  # Backward-compatible additions
@@ -542,6 +566,7 @@ git push --tags
 ```
 
 Users can pin to specific versions:
+
 ```bash
 amplifier collection add git+https://github.com/user/my-collection@v1.0.0
 ```
@@ -549,6 +574,7 @@ amplifier collection add git+https://github.com/user/my-collection@v1.0.0
 ### 2. Document Dependencies Clearly
 
 If your collection depends on others:
+
 - Declare in `[tool.amplifier.collection.requires]`
 - Document in README.md
 - Provide installation order
@@ -556,6 +582,7 @@ If your collection depends on others:
 ### 3. Provide Examples
 
 Include example usage in README:
+
 - How to install
 - How to use profiles
 - How to run scenario tools
@@ -564,10 +591,12 @@ Include example usage in README:
 ### 4. Keep Focused
 
 Collections should have clear purpose:
+
 - **Good**: "Memory optimization expertise" (focused)
 - **Bad**: "Everything for development" (unfocused)
 
 Focused collections are easier to:
+
 - Maintain
 - Document
 - Use

@@ -50,6 +50,36 @@ my-collection/
 
 ---
 
+## Package Structure for Installation
+
+Collections are distributed as Python packages. When installed via `uv pip install` the resulting directory under `.amplifier/collections/<collection-name>/` MUST contain:
+
+```
+<collection-name>/
+  agents/ …
+  profiles/ …
+  context/ …
+  scenario-tools/ …
+  templates/ …
+  docs/ …
+
+  <python_package>/              # project.name with hyphens → underscores
+    __init__.py
+    pyproject.toml               # runtime metadata copy
+
+  *.dist-info/                   # pip-generated metadata
+```
+
+Implementation requirements:
+
+1. **Root `pyproject.toml`** uses `setuptools` (or equivalent PEP 517 builder) so the project can be installed with `uv`/`pip`.
+2. **Python package directory** named `project.name.replace('-', '_')` with minimal `__init__.py` and an embedded copy of `pyproject.toml`. The CLI reads this file after installation to recover metadata.
+3. **MANIFEST.in** (or build backend equivalent) must include resource directories (`profiles/`, `agents/`, `context/`, `scenario-tools/`, `templates/`, `docs/`) plus metadata files so wheels contain the same layout as the source tree.
+
+Collections MUST NOT rely on post-install git operations—installations are purely pip/uv driven.
+
+---
+
 ## Discovery Algorithm
 
 The amplifier-collections library discovers resources using filesystem conventions:
