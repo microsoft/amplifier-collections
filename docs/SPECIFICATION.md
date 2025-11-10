@@ -638,7 +638,7 @@ Agent instructions here.
 
 ### Scenario Tools
 
-See [Scenario Tools Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/SCENARIO_TOOLS_GUIDE.md) for complete specification.
+Sophisticated CLI tools built using multiple specialized AI configs orchestrated by code. Each cognitive subtask (analytical, creative, evaluative) gets its own optimized session configuration.
 
 **Requirements:**
 - Must be Python package with `pyproject.toml`
@@ -647,7 +647,7 @@ See [Scenario Tools Guide](https://github.com/microsoft/amplifier-dev/blob/main/
 
 ### Modules
 
-See [Module Development Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/MODULE_DEVELOPMENT.md) for complete specification.
+Custom Amplifier modules that extend functionality (providers, tools, hooks, orchestrators).
 
 **Requirements:**
 - Must be valid Python package

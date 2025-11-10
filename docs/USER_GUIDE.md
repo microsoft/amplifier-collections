@@ -243,8 +243,6 @@ memory-analyzer --help  # Now available in PATH
 uvx --from memory-solution memory-analyzer [args]
 ```
 
-See [SCENARIO_TOOLS_GUIDE](https://github.com/microsoft/amplifier-dev/blob/main/docs/SCENARIO_TOOLS_GUIDE.md) for creating scenario tools.
-
 ---
 
 ## Troubleshooting
@@ -346,10 +344,8 @@ amplifier collection add git+https://github.com/user/memory-solution
 
 - **[Collection Authoring Guide](AUTHORING.md)** - Creating your own collections
 - **[amplifier-collections API Reference](../README.md)** - Python API for developers
-- [Scenario Tools Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/SCENARIO_TOOLS_GUIDE.md) - Creating sophisticated CLI tools
 - **[Profile Authoring](https://github.com/microsoft/amplifier-profiles/blob/main/docs/PROFILE_AUTHORING.md)** - Creating profiles that use collections
 - **[Agent Authoring](https://github.com/microsoft/amplifier-profiles/blob/main/docs/AGENT_AUTHORING.md)** - Creating agents that use collections
-- [Context Loading](https://github.com/microsoft/amplifier-dev/blob/main/docs/CONTEXT_LOADING.md) - @mention syntax details
 
 ---
 

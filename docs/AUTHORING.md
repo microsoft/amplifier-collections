@@ -380,9 +380,7 @@ scenario-tools/
     HOW_TO_BUILD.md         # Builder guide
 ```
 
-**See**: [Scenario Tools Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/SCENARIO_TOOLS_GUIDE.md) for complete tutorial on building sophisticated CLI tools.
-
-**See**: [Toolkit Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/TOOLKIT_GUIDE.md) for toolkit utilities available when building scenario tools.
+Scenario tools are sophisticated CLI tools built using multiple specialized AI configs orchestrated by code. Each cognitive subtask (analytical, creative, evaluative) gets its own optimized session configuration.
 
 ### Add Modules (`modules/*`)
 
@@ -396,7 +394,7 @@ modules/
     hook.py
 ```
 
-Each module needs its own `pyproject.toml` with entry points. See [Module Development Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/MODULE_DEVELOPMENT.md) for complete module authoring guidance.
+Each module needs its own `pyproject.toml` with entry points. Modules must implement the appropriate protocol from amplifier-core (`Provider`, `Tool`, `Hook`, etc.) and include an entry point under `[project.entry-points."amplifier.modules"]`.
 
 ---
 
@@ -677,11 +675,8 @@ Focused collections are easier to:
 
 - **[Collections User Guide](USER_GUIDE.md)** - Using collections
 - **[amplifier-collections API Reference](../README.md)** - Python API for developers
-- [Scenario Tools Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/SCENARIO_TOOLS_GUIDE.md) - Building sophisticated CLI tools
-- [Toolkit Guide](https://github.com/microsoft/amplifier-dev/blob/main/docs/TOOLKIT_GUIDE.md) - Toolkit utilities for scenario tools
 - **[Profile Authoring](https://github.com/microsoft/amplifier-profiles/blob/main/docs/PROFILE_AUTHORING.md)** - Creating profiles
 - **[Agent Authoring](https://github.com/microsoft/amplifier-profiles/blob/main/docs/AGENT_AUTHORING.md)** - Creating agents
-- [Module Development](https://github.com/microsoft/amplifier-dev/blob/main/docs/MODULE_DEVELOPMENT.md) - Creating custom modules
 
 ---
 
