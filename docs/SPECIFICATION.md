@@ -224,11 +224,21 @@ exact = "==1.5.0"         # Exact: specific version only
 
 Collections are resolved using **first-match-wins** strategy in precedence order:
 
-**Order (highest to lowest precedence):**
-
-1. **Project** - `.amplifier/collections/` (workspace-specific)
-2. **User** - `~/.amplifier/collections/` (user-installed)
-3. **Bundled** - Application-provided (system defaults)
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. PROJECT (highest)                                         │
+│    .amplifier/collections/                                   │
+│    → Workspace-specific, overrides everything               │
+├─────────────────────────────────────────────────────────────┤
+│ 2. USER                                                      │
+│    ~/.amplifier/collections/                                │
+│    → User-installed, overrides bundled                      │
+├─────────────────────────────────────────────────────────────┤
+│ 3. BUNDLED (lowest)                                          │
+│    <app>/data/collections/                                   │
+│    → Application-provided defaults                           │
+└─────────────────────────────────────────────────────────────┘
+```
 
 **Example Resolution:**
 

@@ -96,11 +96,27 @@ inside code fences is ignored.
 
 ### Search Path Precedence
 
-Collections resolve in precedence order (highest first): Project → User → Bundled.
+Collections resolve using **first-match-wins** in precedence order:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. PROJECT (highest)                                         │
+│    .amplifier/collections/                                   │
+│    → Workspace-specific, overrides everything               │
+├─────────────────────────────────────────────────────────────┤
+│ 2. USER                                                      │
+│    ~/.amplifier/collections/                                │
+│    → User-installed, overrides bundled                      │
+├─────────────────────────────────────────────────────────────┤
+│ 3. BUNDLED (lowest)                                          │
+│    <app>/data/collections/                                   │
+│    → Application-provided defaults                           │
+└─────────────────────────────────────────────────────────────┘
+```
 
 Applications define search paths; library provides resolution mechanism.
 
-**See:** [Search Path Specification](docs/SPECIFICATION.md#search-path-precedence)
+**See:** [Search Path Specification](docs/SPECIFICATION.md#search-path-precedence) for complete algorithm
 
 ### Pluggable Installation Sources
 
@@ -227,6 +243,20 @@ for agent in resources.agents:
 ```
 
 **See:** [Discovery Algorithm Specification](docs/SPECIFICATION.md#discovery-algorithm)
+
+**Helper utilities** for getting just names:
+
+```python
+from amplifier_collections import list_profiles, list_agents
+
+# Get profile names (without .md extension)
+profile_names = list_profiles(Path("/path/to/collection"))
+# Returns: ['base', 'foundation', 'production']
+
+# Get agent names (without .md extension)
+agent_names = list_agents(Path("/path/to/collection"))
+# Returns: ['analyzer', 'optimizer']
+```
 
 ### Installation
 
@@ -402,7 +432,7 @@ class WebCollectionService:
 ### Custom Installation Source
 
 ```python
-from amplifier_collections import install_collection, CollectionLock, InstallError
+from amplifier_collections import install_collection, CollectionLock, CollectionInstallError
 import httpx
 import zipfile
 
@@ -469,6 +499,31 @@ def test_collection_discovery():
         assert resources.profiles[0].name == "test.md"
 ```
 
+
+---
+
+## Utilities
+
+### extract_collection_name_from_path
+
+```python
+from amplifier_collections import extract_collection_name_from_path
+from pathlib import Path
+
+# Extract collection name from path containing "/collections/"
+path = Path("~/.amplifier/collections/foundation/profiles/base.md")
+name = extract_collection_name_from_path(path)
+# Returns: "foundation" (reads from pyproject.toml)
+```
+
+**Purpose**: Extract collection metadata name from any path within a collection.
+
+**Algorithm**:
+1. Walk up from path to find `/collections/` component
+2. Read collection root's `pyproject.toml`
+3. Return `[project].name` field
+
+**Used by**: amplifier-profiles for collection:name resolution
 
 ---
 
