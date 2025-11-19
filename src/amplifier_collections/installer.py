@@ -143,7 +143,7 @@ async def install_collection(
 
         # Step 6: Add to lock file (if provided)
         if lock is not None:
-            # Try to get commit SHA if source has it
+            # Get commit SHA from source (GitSource provides via commit_sha property)
             commit_sha = getattr(source, "commit_sha", None)
             source_uri = getattr(source, "uri", "unknown")
 
@@ -154,7 +154,13 @@ async def install_collection(
                 path=target_dir,
                 modules=module_metadata,
             )
-            logger.debug(f"Added {metadata.name} to lock file with {len(module_metadata)} modules")
+
+            if commit_sha:
+                logger.debug(
+                    f"Added {metadata.name} to lock file with commit {commit_sha[:7]} and {len(module_metadata)} modules"
+                )
+            else:
+                logger.debug(f"Added {metadata.name} to lock file (no commit SHA) with {len(module_metadata)} modules")
 
         logger.info(f"Successfully installed collection: {metadata.name}")
         return metadata
