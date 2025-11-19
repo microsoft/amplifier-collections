@@ -93,6 +93,19 @@ class CollectionLock:
             with open(self.lock_path) as f:
                 data = json.load(f)
 
+            # Auto-migrate from v1.0 to v1.1
+            if data.get("version") == "1.0":
+                logger.info("Migrating lock file from v1.0 to v1.1")
+                data["version"] = "1.1"
+                # Add empty modules dict to all entries
+                for entry in data.get("collections", {}).values():
+                    if "modules" not in entry:
+                        entry["modules"] = {}
+                # Save migrated version
+                with open(self.lock_path, "w") as f:
+                    json.dump(data, f, indent=2)
+                logger.info("Lock file migrated to v1.1")
+
             # Validate version
             if data.get("version") != self.VERSION:
                 logger.warning(f"Lock file version mismatch: expected {self.VERSION}, got {data.get('version')}")
