@@ -17,6 +17,7 @@ import json
 import logging
 from dataclasses import asdict
 from dataclasses import dataclass
+from dataclasses import field
 from datetime import UTC
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,7 @@ class CollectionLockEntry:
     commit: str | None
     path: str
     installed_at: str
+    modules: dict[str, dict[str, str]] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -52,20 +54,21 @@ class CollectionLock:
 
     Lock format (JSON):
     {
-      "version": "1.0",
+      "version": "1.1",
       "collections": {
         "foundation": {
           "name": "foundation",
           "source": "git+https://github.com/org/foundation@main",
           "commit": "abc123...",
           "path": "~/.amplifier/collections/foundation",
-          "installed_at": "2025-10-26T12:00:00Z"
+          "installed_at": "2025-10-26T12:00:00Z",
+          "modules": {}
         }
       }
     }
     """
 
-    VERSION = "1.0"
+    VERSION = "1.1"
 
     def __init__(self, lock_path: Path):
         """Initialize lock manager with app-provided lock path.
@@ -126,6 +129,7 @@ class CollectionLock:
         source: str,
         commit: str | None,
         path: Path,
+        modules: dict[str, dict[str, str]] | None = None,
     ) -> None:
         """
         Add or update collection in lock file.
@@ -135,6 +139,7 @@ class CollectionLock:
             source: Git source URI
             commit: Git commit SHA (None if not git)
             path: Installation path
+            modules: Optional module registrations (module_id -> {type, path})
         """
         entry = CollectionLockEntry(
             name=name,
@@ -142,6 +147,7 @@ class CollectionLock:
             commit=commit,
             path=str(path),
             installed_at=datetime.now(UTC).isoformat(),
+            modules=modules or {},
         )
 
         self._data[name] = entry

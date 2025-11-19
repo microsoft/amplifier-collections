@@ -295,21 +295,32 @@ Applications define lock file location:
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
   "collections": {
     "my-collection": {
       "name": "my-collection",
       "source": "git+https://github.com/user/my-collection@v1.0.0",
       "commit": "abc123def456789...",
       "path": "/home/user/.amplifier/collections/my-collection",
-      "installed_at": "2025-10-31T10:30:00Z"
+      "installed_at": "2025-10-31T10:30:00Z",
+      "modules": {
+        "tool-custom": {
+          "type": "tool",
+          "path": "modules/tool-custom"
+        },
+        "hooks-logger": {
+          "type": "hook",
+          "path": "modules/hooks-logger"
+        }
+      }
     },
     "another-collection": {
       "name": "another-collection",
       "source": "git+https://github.com/org/another@main",
       "commit": "def456abc123...",
       "path": "/home/user/.amplifier/collections/another-collection",
-      "installed_at": "2025-10-31T11:15:00Z"
+      "installed_at": "2025-10-31T11:15:00Z",
+      "modules": {}
     }
   }
 }
@@ -319,13 +330,16 @@ Applications define lock file location:
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
-| `version` | string | **YES** | Lock file format version ("1.0") |
+| `version` | string | **YES** | Lock file format version ("1.1") |
 | `collections` | object | **YES** | Dictionary of collection entries (key = collection name) |
 | `collections[].name` | string | **YES** | Collection name |
 | `collections[].source` | string | **YES** | Installation source URI |
 | `collections[].commit` | string\|null | **YES** | Git commit SHA (null if not git) |
 | `collections[].path` | string | **YES** | Absolute installation path |
 | `collections[].installed_at` | string | **YES** | ISO 8601 timestamp |
+| `collections[].modules` | object | **YES** | Dictionary of module registrations (key = module name) |
+| `collections[].modules[].type` | string | **YES** | Module type (tool, hook, provider, orchestrator, context) |
+| `collections[].modules[].path` | string | **YES** | Relative path from collection root to module directory |
 
 **Parsing:**
 - Uses Python stdlib `json`

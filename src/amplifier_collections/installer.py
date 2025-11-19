@@ -129,7 +129,19 @@ async def install_collection(
         resources = discover_collection_resources(collection_root)
         logger.debug(f"Discovered resources: {resources}")
 
-        # Step 5: Add to lock file (if provided)
+        # Step 5: Build module metadata for lock file
+        module_metadata: dict[str, dict[str, str]] = {}
+        for module_path in resources.modules:
+            module_name = module_path.name
+            # Store relative path from target_dir (installation root)
+            relative_path = module_path.relative_to(target_dir)
+            module_metadata[module_name] = {
+                "path": str(relative_path),
+                "type": "unknown",  # Could extract from entry points, but start simple
+            }
+            logger.debug(f"Registered module: {module_name} at {relative_path}")
+
+        # Step 6: Add to lock file (if provided)
         if lock is not None:
             # Try to get commit SHA if source has it
             commit_sha = getattr(source, "commit_sha", None)
@@ -140,8 +152,9 @@ async def install_collection(
                 source=source_uri,
                 commit=commit_sha,
                 path=target_dir,
+                modules=module_metadata,
             )
-            logger.debug(f"Added {metadata.name} to lock file")
+            logger.debug(f"Added {metadata.name} to lock file with {len(module_metadata)} modules")
 
         logger.info(f"Successfully installed collection: {metadata.name}")
         return metadata
