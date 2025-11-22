@@ -90,7 +90,7 @@ class CollectionLock:
             return
 
         try:
-            with open(self.lock_path) as f:
+            with open(self.lock_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Auto-migrate from v1.0 to v1.1
@@ -130,7 +130,7 @@ class CollectionLock:
         }
 
         try:
-            with open(self.lock_path, "w") as f:
+            with open(self.lock_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             logger.debug(f"Saved lock file with {len(self._data)} collections")
         except Exception as e:
