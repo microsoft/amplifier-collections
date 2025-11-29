@@ -166,6 +166,10 @@ async def install_collection(
         return metadata
 
     except Exception as e:
+        # Clean up partial install (defense-in-depth - source should clean up, but ensure)
+        if target_dir.exists():
+            logger.debug(f"Cleaning up failed install at {target_dir}")
+            shutil.rmtree(target_dir)
         if isinstance(e, CollectionInstallError):
             raise
         raise CollectionInstallError(f"Failed to install collection: {e}") from e
