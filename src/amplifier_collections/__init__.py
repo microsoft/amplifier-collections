@@ -19,6 +19,7 @@ from .lock import CollectionLock
 from .lock import CollectionLockEntry
 from .protocols import InstallSourceProtocol
 from .resolver import CollectionResolver
+from .resolver import CollectionSourceProvider
 from .schema import CollectionMetadata
 from .utils import extract_collection_name_from_path
 
@@ -27,6 +28,7 @@ __all__ = [
     "CollectionMetadata",
     # Resolution
     "CollectionResolver",
+    "CollectionSourceProvider",
     # Discovery
     "CollectionResources",
     "discover_collection_resources",

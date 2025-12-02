@@ -14,8 +14,30 @@ REFACTORED from CLI: Search paths must be injected by app, not hardcoded.
 
 import logging
 from pathlib import Path
+from typing import Protocol
+from typing import runtime_checkable
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class CollectionSourceProvider(Protocol):
+    """Protocol for providing collection source overrides.
+
+    Apps inject this to provide source override lookup from settings.
+    The resolver checks this FIRST before filesystem search.
+    """
+
+    def get_collection_source(self, collection_name: str) -> str | None:
+        """Get source override for a collection.
+
+        Args:
+            collection_name: Name of collection to look up
+
+        Returns:
+            Source URI (file path or git URL) if override exists, None otherwise
+        """
+        ...
 
 
 def _has_matching_name(pyproject_path: Path, expected_name: str) -> bool:
@@ -56,12 +78,18 @@ class CollectionResolver:
     - Clear error messages
     """
 
-    def __init__(self, search_paths: list[Path]):
-        """Initialize resolver with app-provided search paths.
+    def __init__(
+        self,
+        search_paths: list[Path],
+        source_provider: CollectionSourceProvider | None = None,
+    ):
+        """Initialize resolver with app-provided search paths and optional source provider.
 
         Args:
             search_paths: List of paths to search in precedence order (lowest to highest).
                          For example: [bundled, user, project] where project has highest precedence.
+            source_provider: Optional provider for collection source overrides. If provided,
+                           overrides are checked FIRST before filesystem search.
 
         Example:
             >>> search_paths = [
@@ -72,10 +100,15 @@ class CollectionResolver:
             >>> resolver = CollectionResolver(search_paths=search_paths)
         """
         self.search_paths = search_paths
+        self.source_provider = source_provider
 
     def resolve(self, collection_name: str) -> Path | None:
         """
         Resolve collection name to installation path.
+
+        Resolution order:
+        1. Source override (if source_provider configured) - file paths only
+        2. Filesystem search (search_paths in reverse precedence order)
 
         Supports both structure types and naming patterns:
         - Flat: collections/name/pyproject.toml (git clone, manual)
@@ -84,8 +117,6 @@ class CollectionResolver:
 
         Per RUTHLESS_SIMPLICITY: Search by metadata name, not directory name.
         Per WORK_WITH_STANDARDS: Python packaging creates nested structure.
-
-        Searches in reverse precedence order (highest first).
 
         Args:
             collection_name: Name of collection from pyproject.toml metadata (e.g., "design-intelligence")
@@ -99,6 +130,16 @@ class CollectionResolver:
             >>> # Finds ~/.amplifier/collections/amplifier-collection-design-intelligence/
             >>> # by reading pyproject.toml files, not matching directory names
         """
+        # Check source override first (highest priority)
+        if self.source_provider:
+            source = self.source_provider.get_collection_source(collection_name)
+            if source:
+                resolved = self._resolve_source(source)
+                if resolved:
+                    logger.debug(f"Resolved '{collection_name}' via source override: {resolved}")
+                    return resolved
+                # Source override didn't resolve to valid path, fall through to filesystem
+
         # Search in reverse order (highest precedence first)
         for search_path in reversed(self.search_paths):
             if not search_path.exists():
@@ -231,3 +272,37 @@ class CollectionResolver:
                     collections[metadata_name] = collection_root
 
         return list(collections.items())
+
+    def _resolve_source(self, source: str) -> Path | None:
+        """Resolve a source URI to a local path.
+
+        Handles file paths only. Git URLs are not resolved here - they require
+        the module resolution system which handles cloning/caching.
+
+        Args:
+            source: Source URI (file path or git URL)
+
+        Returns:
+            Resolved Path if source is a valid local path, None otherwise
+        """
+        # Skip git URLs - they need module resolution system
+        if source.startswith("git+") or source.startswith("https://") or source.startswith("git://"):
+            logger.debug(f"Source override is git URL, skipping local resolution: {source}")
+            return None
+
+        # Handle file paths
+        path = Path(source).expanduser()
+        if not path.is_absolute():
+            # Relative paths resolved from current working directory
+            path = Path.cwd() / path
+
+        if path.exists() and path.is_dir():
+            # Verify it's a valid collection (has pyproject.toml)
+            if (path / "pyproject.toml").exists():
+                return path.resolve()
+            # Check for nested structure
+            for item in path.iterdir():
+                if item.is_dir() and (item / "pyproject.toml").exists():
+                    return item.resolve()
+
+        return None
