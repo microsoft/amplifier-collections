@@ -102,7 +102,7 @@ class CollectionLock:
                     if "modules" not in entry:
                         entry["modules"] = {}
                 # Save migrated version
-                with open(self.lock_path, "w") as f:
+                with open(self.lock_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2)
                 logger.info("Lock file migrated to v1.1")
 
